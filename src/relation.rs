@@ -2,7 +2,10 @@ use std::marker::PhantomData;
 
 use crate::{
     op::{DynOp, Op},
-    operators::{consolidate::Consolidate, distinct::Distinct, flat_map::FlatMap, join::InnerJoin},
+    operators::{
+        consolidate::Consolidate, distinct::Distinct, flat_map::FlatMap, join::InnerJoin,
+        reduce::Reduce,
+    },
     value_count::ValueCount,
 };
 
@@ -29,7 +32,7 @@ impl<T, C> Relation<T, C> {
         }
     }
 
-    pub fn flat_map<U, I: IntoIterator<Item = U>, F: FnMut(T) -> I>(
+    pub fn flat_map<U, I: IntoIterator<Item = U>, F: Fn(T) -> I>(
         self,
         f: F,
     ) -> Relation<U, FlatMap<T, F, C>> {
@@ -54,14 +57,21 @@ impl<T, C> Relation<T, C> {
     }
 }
 
-impl<K, VL, C> Relation<(K, VL), C> {
+impl<K, V, C> Relation<(K, V), C> {
     pub fn join<VR, CR>(
         self,
         other: Relation<(K, VR), CR>,
-    ) -> Relation<(K, VL, VR), InnerJoin<K, VL, C, VR, CR>> {
+    ) -> Relation<(K, V, VR), InnerJoin<K, V, C, VR, CR>> {
         Relation {
             phantom: PhantomData,
             inner: InnerJoin::new(self, other),
+        }
+    }
+
+    pub fn reduce<Y, F>(self, f: F) -> Relation<(K, Y), Reduce<K, V, Y, F, C>> {
+        Relation {
+            phantom: PhantomData,
+            inner: Reduce::new(self, f),
         }
     }
 }

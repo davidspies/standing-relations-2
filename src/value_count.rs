@@ -12,6 +12,26 @@ pub struct ValueCount {
     pub(crate) count: isize,
 }
 
+impl ValueCount {
+    pub fn decr(commit_id: CommitId) -> Self {
+        Self {
+            commit_id,
+            count: -1,
+        }
+    }
+
+    pub fn incr(commit_id: CommitId) -> Self {
+        Self {
+            commit_id,
+            count: 1,
+        }
+    }
+
+    pub fn count(&self) -> isize {
+        self.count
+    }
+}
+
 impl Add for ValueCount {
     type Output = Self;
 

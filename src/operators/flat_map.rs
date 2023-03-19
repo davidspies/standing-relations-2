@@ -14,7 +14,7 @@ impl<S, F, C> FlatMap<S, F, C> {
 impl<S, I, T, F, C> Op<T> for FlatMap<S, F, C>
 where
     I: IntoIterator<Item = T>,
-    F: FnMut(S) -> I,
+    F: Fn(S) -> I,
     C: Op<S>,
 {
     fn foreach(&mut self, mut f: impl FnMut(T, ValueCount)) {

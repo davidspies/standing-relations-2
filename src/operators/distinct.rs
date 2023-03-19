@@ -5,6 +5,57 @@ use crate::{
     value_count::ValueCount,
 };
 
+pub struct Distinct<T, C> {
+    sub_rel: Relation<T, C>,
+    current_counts: E1Map<T, ValueCount>,
+    changed_scratch: HashMap<T, DistinctChange>,
+}
+
+impl<T, C> Distinct<T, C> {
+    pub fn new(sub_rel: Relation<T, C>) -> Self {
+        Self {
+            sub_rel,
+            current_counts: E1Map::default(),
+            changed_scratch: HashMap::default(),
+        }
+    }
+}
+
+impl<T: Clone + Eq + Hash, C: Op<T>> Op<T> for Distinct<T, C> {
+    fn foreach(&mut self, mut f: impl FnMut(T, ValueCount)) {
+        self.sub_rel.foreach(
+            |value, count| match self.current_counts.add(value.clone(), count) {
+                ValueChanges {
+                    was_zero: true,
+                    is_zero: false,
+                } => self.changed_scratch.entry(value).or_default().add(count.commit_id),
+                ValueChanges {
+                    was_zero: false,
+                    is_zero: true,
+                } => self
+                    .changed_scratch
+                    .entry(value)
+                    .or_default()
+                    .remove(count.commit_id),
+                ValueChanges {
+                    was_zero: true,
+                    is_zero: true,
+                } => panic!("zero count"),
+                ValueChanges {
+                    was_zero: false,
+                    is_zero: false,
+                } => (),
+            },
+        );
+        self.changed_scratch.drain().for_each(|(value, change)| {
+            let count = change.count();
+            if count.count != 0 {
+                f(value, count)
+            }
+        })
+    }
+}
+
 #[derive(Default)]
 struct DistinctChange {
     commit_id: CommitId,
@@ -59,56 +110,5 @@ impl DistinctChangeValue {
             DistinctChangeValue::NoChange => 0,
             DistinctChangeValue::Added => 1,
         }
-    }
-}
-
-pub struct Distinct<T, C> {
-    sub_rel: Relation<T, C>,
-    current_counts: E1Map<T, ValueCount>,
-    changed: HashMap<T, DistinctChange>,
-}
-
-impl<T, C> Distinct<T, C> {
-    pub fn new(sub_rel: Relation<T, C>) -> Self {
-        Self {
-            sub_rel,
-            current_counts: E1Map::default(),
-            changed: HashMap::default(),
-        }
-    }
-}
-
-impl<T: Clone + Eq + Hash, C: Op<T>> Op<T> for Distinct<T, C> {
-    fn foreach(&mut self, mut f: impl FnMut(T, ValueCount)) {
-        self.sub_rel.foreach(
-            |value, count| match self.current_counts.add(value.clone(), count) {
-                ValueChanges {
-                    was_zero: true,
-                    is_zero: false,
-                } => self.changed.entry(value).or_default().add(count.commit_id),
-                ValueChanges {
-                    was_zero: false,
-                    is_zero: true,
-                } => self
-                    .changed
-                    .entry(value)
-                    .or_default()
-                    .remove(count.commit_id),
-                ValueChanges {
-                    was_zero: true,
-                    is_zero: true,
-                } => panic!("zero count"),
-                ValueChanges {
-                    was_zero: false,
-                    is_zero: false,
-                } => (),
-            },
-        );
-        self.changed.drain().for_each(|(value, change)| {
-            let count = change.count();
-            if count.count != 0 {
-                f(value, count)
-            }
-        })
     }
 }
