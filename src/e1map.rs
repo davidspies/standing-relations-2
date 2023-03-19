@@ -7,21 +7,34 @@ use std::{
 
 use derivative::Derivative;
 
-use crate::value_count::ValueCount;
-
-pub(crate) trait Nullable: Default {
-    fn is_empty(&self) -> bool;
-}
+use crate::{
+    add_to_value::{AddToValue, ValueChanges},
+    nullable::Nullable,
+};
 
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
-pub(crate) struct E1Map<K, V> {
+pub struct E1Map<K, V> {
     singleton: Option<(K, V)>,
     non_singleton: HashMap<K, V>,
 }
 
+pub type Iter<'a, K, V> = Chain<option::IntoIter<(&'a K, &'a V)>, hash_map::Iter<'a, K, V>>;
+
 impl<K, V> E1Map<K, V> {
-    pub(crate) fn get(&self, key: &K) -> Option<&V>
+    pub fn is_empty(&self) -> bool {
+        self.singleton.is_none() && self.non_singleton.is_empty()
+    }
+
+    pub fn iter(&self) -> Iter<K, V> {
+        self.singleton
+            .as_ref()
+            .map(|(k, v)| (k, v))
+            .into_iter()
+            .chain(self.non_singleton.iter())
+    }
+
+    pub fn get(&self, key: &K) -> Option<&V>
     where
         K: Eq + Hash,
     {
@@ -100,45 +113,16 @@ impl<K, V> E1Map<K, V> {
 impl<'a, K, V> IntoIterator for &'a E1Map<K, V> {
     type Item = (&'a K, &'a V);
 
-    type IntoIter = Chain<option::IntoIter<(&'a K, &'a V)>, hash_map::Iter<'a, K, V>>;
+    type IntoIter = Iter<'a, K, V>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.singleton
-            .as_ref()
-            .map(|(k, v)| (k, v))
-            .into_iter()
-            .chain(self.non_singleton.iter())
-    }
-}
-
-pub(crate) struct ValueChanges {
-    pub(crate) was_zero: bool,
-    pub(crate) is_zero: bool,
-}
-
-pub(crate) trait AddToValue<V> {
-    #[must_use]
-    fn add_to(self, v: &mut V) -> ValueChanges;
-}
-
-impl Nullable for ValueCount {
-    fn is_empty(&self) -> bool {
-        self.count == 0
-    }
-}
-
-impl AddToValue<ValueCount> for ValueCount {
-    fn add_to(self, v: &mut ValueCount) -> ValueChanges {
-        let was_zero = v.count == 0;
-        *v += self;
-        let is_zero = v.count == 0;
-        ValueChanges { was_zero, is_zero }
+        self.iter()
     }
 }
 
 impl<K, V> Nullable for E1Map<K, V> {
     fn is_empty(&self) -> bool {
-        self.singleton.is_none() && self.non_singleton.is_empty()
+        self.is_empty()
     }
 }
 
