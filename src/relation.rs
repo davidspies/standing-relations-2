@@ -1,6 +1,7 @@
 use std::{hash::Hash, marker::PhantomData};
 
 use crate::{
+    e1map::E1Map,
     op::{DynOp, Op},
     operators::{
         concat::Concat, consolidate::Consolidate, distinct::Distinct, flat_map::FlatMap,
@@ -86,6 +87,18 @@ impl<T, C> Relation<T, C> {
         self.map(|t| (t, ()))
             .join(other.map(|t| (t, ())))
             .map(|(t, (), ())| t)
+    }
+
+    pub fn counts(self) -> Relation<(T, isize), impl Op<(T, isize)>>
+    where
+        T: Eq + Hash + Clone,
+        C: Op<T>,
+    {
+        self.map(|t| (t, ()))
+            .reduce(|_: &T, vals: &E1Map<(), ValueCount>| {
+                let ((), count) = vals.iter().next().unwrap();
+                count.count()
+            })
     }
 }
 
