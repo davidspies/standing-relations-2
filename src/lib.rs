@@ -1,6 +1,9 @@
-use e1map::E1Map;
-use op::Op;
-use value_count::ValueCount;
+use crossbeam_channel::Receiver;
+
+use self::op::Op;
+use self::value_count::ValueCount;
+
+pub use relation::Relation;
 
 mod add_to_value;
 mod commit_id;
@@ -11,16 +14,12 @@ mod operators;
 mod relation;
 mod value_count;
 
-pub use relation::Relation;
-
-pub struct InputOp<T> {
-    unprocessed_values: E1Map<T, ValueCount>,
-}
+pub struct InputOp<T>(Receiver<(T, ValueCount)>);
 
 impl<T> Op<T> for InputOp<T> {
     fn foreach(&mut self, mut f: impl FnMut(T, ValueCount)) {
-        self.unprocessed_values
-            .drain()
-            .for_each(|(value, count)| f(value, count))
+        while let Ok((value, count)) = self.0.try_recv() {
+            f(value, count)
+        }
     }
 }

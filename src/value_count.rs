@@ -1,4 +1,4 @@
-use std::ops::{Add, AddAssign, Mul};
+use std::ops::{Add, AddAssign, Mul, Neg};
 
 use crate::{
     add_to_value::{AddToValue, ValueChanges},
@@ -56,6 +56,17 @@ impl Mul for ValueCount {
         Self {
             commit_id: self.commit_id.max(rhs.commit_id),
             count: self.count * rhs.count,
+        }
+    }
+}
+
+impl Neg for ValueCount {
+    type Output = Self;
+
+    fn neg(self) -> Self::Output {
+        Self {
+            commit_id: self.commit_id,
+            count: -self.count,
         }
     }
 }

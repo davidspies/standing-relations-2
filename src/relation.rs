@@ -1,10 +1,10 @@
-use std::marker::PhantomData;
+use std::{hash::Hash, marker::PhantomData};
 
 use crate::{
     op::{DynOp, Op},
     operators::{
-        consolidate::Consolidate, distinct::Distinct, flat_map::FlatMap, join::InnerJoin,
-        reduce::Reduce,
+        concat::Concat, consolidate::Consolidate, distinct::Distinct, flat_map::FlatMap,
+        join::InnerJoin, negate::Negate, reduce::Reduce,
     },
     value_count::ValueCount,
 };
@@ -32,10 +32,7 @@ impl<T, C> Relation<T, C> {
         }
     }
 
-    pub fn flat_map<U, I: IntoIterator<Item = U>, F: Fn(T) -> I>(
-        self,
-        f: F,
-    ) -> Relation<U, FlatMap<T, F, C>> {
+    pub fn flat_map<U, F>(self, f: F) -> Relation<U, FlatMap<T, F, C>> {
         Relation {
             phantom: PhantomData,
             inner: FlatMap::new(self, f),
@@ -55,6 +52,41 @@ impl<T, C> Relation<T, C> {
             inner: Consolidate::new(self),
         }
     }
+
+    pub fn concat<CR>(self, other: Relation<T, CR>) -> Relation<T, Concat<T, C, CR>> {
+        Relation {
+            phantom: PhantomData,
+            inner: Concat::new(self, other),
+        }
+    }
+
+    pub fn negate(self) -> Relation<T, Negate<T, C>> {
+        Relation {
+            phantom: PhantomData,
+            inner: Negate::new(self),
+        }
+    }
+
+    pub fn minus<CR>(self, other: Relation<T, CR>) -> Relation<T, Concat<T, C, Negate<T, CR>>> {
+        self.concat(other.negate())
+    }
+
+    pub fn map<U>(self, f: impl Fn(T) -> U) -> Relation<U, impl Op<U>>
+    where
+        C: Op<T>,
+    {
+        self.flat_map(move |x| [f(x)])
+    }
+
+    pub fn intersection<CR: Op<T>>(self, other: Relation<T, CR>) -> Relation<T, impl Op<T>>
+    where
+        T: Eq + Hash + Clone,
+        C: Op<T>,
+    {
+        self.map(|t| (t, ()))
+            .join(other.map(|t| (t, ())))
+            .map(|(t, (), ())| t)
+    }
 }
 
 impl<K, V, C> Relation<(K, V), C> {
@@ -73,5 +105,27 @@ impl<K, V, C> Relation<(K, V), C> {
             phantom: PhantomData,
             inner: Reduce::new(self, f),
         }
+    }
+
+    pub fn semijoin(self, other: Relation<K, impl Op<K>>) -> Relation<(K, V), impl Op<(K, V)>>
+    where
+        K: Eq + Hash + Clone,
+        V: Eq + Hash + Clone,
+        C: Op<(K, V)>,
+    {
+        self.join(other.map(|t| (t, ()))).map(|(k, v, ())| (k, v))
+    }
+
+    pub fn fsts(self) -> Relation<K, impl Op<K>>
+    where
+        C: Op<(K, V)>,
+    {
+        self.map(|(k, _v)| k)
+    }
+    pub fn snds(self) -> Relation<V, impl Op<V>>
+    where
+        C: Op<(K, V)>,
+    {
+        self.map(|(_k, v)| v)
     }
 }
