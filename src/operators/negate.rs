@@ -1,4 +1,4 @@
-use crate::{op::Op, value_count::ValueCount, Relation};
+use crate::{op::Op, value_count::ValueCount, relation::Relation};
 
 pub struct Negate<T, C> {
     sub_rel: Relation<T, C>,

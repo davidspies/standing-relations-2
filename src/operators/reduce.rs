@@ -4,7 +4,9 @@ use std::{
     mem,
 };
 
-use crate::{commit_id::CommitId, e1map::E1Map, op::Op, value_count::ValueCount, Relation};
+use crate::{
+    commit_id::CommitId, e1map::E1Map, op::Op, relation::Relation, value_count::ValueCount,
+};
 
 pub struct Reduce<K, V, Y, F, C> {
     sub_rel: Relation<(K, V), C>,

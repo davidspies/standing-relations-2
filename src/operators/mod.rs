@@ -1,3 +1,4 @@
+pub mod antijoin;
 pub mod concat;
 pub mod consolidate;
 pub mod distinct;

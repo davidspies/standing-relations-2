@@ -1,4 +1,4 @@
-use crate::{op::Op, value_count::ValueCount, Relation};
+use crate::{op::Op, value_count::ValueCount, relation::Relation};
 
 pub struct Concat<T, CL, CR> {
     left: Relation<T, CL>,

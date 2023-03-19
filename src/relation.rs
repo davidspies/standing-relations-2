@@ -6,8 +6,8 @@ use crate::{
     e1map::E1Map,
     op::{DynOp, Op},
     operators::{
-        concat::Concat, consolidate::Consolidate, distinct::Distinct, flat_map::FlatMap,
-        join::InnerJoin, negate::Negate, reduce::Reduce,
+        antijoin::AntiJoin, concat::Concat, consolidate::Consolidate, distinct::Distinct,
+        flat_map::FlatMap, join::InnerJoin, negate::Negate, reduce::Reduce,
     },
     value_count::ValueCount,
 };
@@ -85,7 +85,7 @@ impl<T, C> Relation<T, C> {
         self.flat_map(move |x| iter::once(f(x)))
     }
 
-    pub fn intersection<CR: Op<T>>(self, other: Relation<T, CR>) -> Relation<T, impl Op<T>>
+    pub fn intersection(self, other: Relation<T, impl Op<T>>) -> Relation<T, impl Op<T>>
     where
         T: Eq + Hash + Clone,
         C: Op<T>,
@@ -93,6 +93,14 @@ impl<T, C> Relation<T, C> {
         self.map(|t| (t, ()))
             .join(other.map(|t| (t, ())))
             .map(|(t, (), ())| t)
+    }
+
+    pub fn set_minus(self, other: Relation<T, impl Op<T>>) -> Relation<T, impl Op<T>>
+    where
+        T: Eq + Hash + Clone,
+        C: Op<T>,
+    {
+        self.map(|t| (t, ())).antijoin(other).fsts()
     }
 
     pub fn counts(self) -> Relation<(T, isize), impl Op<(T, isize)>>
@@ -123,6 +131,16 @@ impl<K, V, C> Relation<(K, V), C> {
         Relation {
             phantom: PhantomData,
             inner: Reduce::new(self, f),
+        }
+    }
+
+    pub fn antijoin<CR: Op<K>>(
+        self,
+        other: Relation<K, CR>,
+    ) -> Relation<(K, V), AntiJoin<K, V, C, CR>> {
+        Relation {
+            phantom: PhantomData,
+            inner: AntiJoin::new(self, other),
         }
     }
 
