@@ -1,6 +1,8 @@
 use std::{
     collections::{hash_map, HashMap},
     hash::Hash,
+    iter::Chain,
+    option,
 };
 
 use derivative::Derivative;
@@ -80,8 +82,12 @@ impl<K, V> E1Map<K, V> {
     }
 }
 
-impl<K, V> E1Map<K, V> {
-    pub(crate) fn iter(&self) -> impl Iterator<Item = (&K, &V)> {
+impl<'a, K, V> IntoIterator for &'a E1Map<K, V> {
+    type Item = (&'a K, &'a V);
+
+    type IntoIter = Chain<option::IntoIter<(&'a K, &'a V)>, hash_map::Iter<'a, K, V>>;
+
+    fn into_iter(self) -> Self::IntoIter {
         self.singleton
             .as_ref()
             .map(|(k, v)| (k, v))

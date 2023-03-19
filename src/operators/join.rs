@@ -19,18 +19,14 @@ where
 {
     fn foreach(&mut self, mut f: impl FnMut((K, VL, VR), ValueCount)) {
         self.left_rel.foreach(|(k, vl), lcount| {
-            if let Some(vrs) = self.right_values.get(&k) {
-                for (vr, &rcount) in vrs.iter() {
-                    f((k.clone(), vl.clone(), vr.clone()), lcount * rcount)
-                }
+            for (vr, &rcount) in self.right_values.get(&k).into_iter().flatten() {
+                f((k.clone(), vl.clone(), vr.clone()), lcount * rcount)
             }
             self.left_values.add(k, (vl, lcount));
         });
         self.right_rel.foreach(|(k, vr), rcount| {
-            if let Some(vls) = self.left_values.get(&k) {
-                for (vl, &lcount) in vls.iter() {
-                    f((k.clone(), vl.clone(), vr.clone()), lcount * rcount)
-                }
+            for (vl, &lcount) in self.left_values.get(&k).into_iter().flatten() {
+                f((k.clone(), vl.clone(), vr.clone()), lcount * rcount)
             }
             self.right_values.add(k, (vr, rcount));
         });
