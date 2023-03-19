@@ -1,4 +1,6 @@
-use std::{hash::Hash, marker::PhantomData};
+#![allow(clippy::type_complexity)]
+
+use std::{convert::identity, hash::Hash, iter, marker::PhantomData};
 
 use crate::{
     e1map::E1Map,
@@ -72,11 +74,15 @@ impl<T, C> Relation<T, C> {
         self.concat(other.negate())
     }
 
+    pub fn flatten<U>(self) -> Relation<U, FlatMap<T, fn(T) -> T, C>> {
+        self.flat_map(identity)
+    }
+
     pub fn map<U>(self, f: impl Fn(T) -> U) -> Relation<U, impl Op<U>>
     where
         C: Op<T>,
     {
-        self.flat_map(move |x| [f(x)])
+        self.flat_map(move |x| iter::once(f(x)))
     }
 
     pub fn intersection<CR: Op<T>>(self, other: Relation<T, CR>) -> Relation<T, impl Op<T>>
