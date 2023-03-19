@@ -5,6 +5,12 @@ pub struct FlatMap<S, F, C> {
     f: F,
 }
 
+impl<S, F, C> FlatMap<S, F, C> {
+    pub fn new(sub_rel: Relation<S, C>, f: F) -> Self {
+        Self { sub_rel, f }
+    }
+}
+
 impl<S, I, T, F, C> Op<T> for FlatMap<S, F, C>
 where
     I: IntoIterator<Item = T>,

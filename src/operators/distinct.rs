@@ -1,6 +1,12 @@
 use std::{collections::HashMap, hash::Hash};
 
-use crate::{commit_id::CommitId, op::Op, relation::Relation, value_count::ValueCount};
+use crate::{
+    commit_id::CommitId,
+    e1map::{E1Map, ValueChanges},
+    op::Op,
+    relation::Relation,
+    value_count::ValueCount,
+};
 
 #[derive(Default)]
 struct DistinctChange {
@@ -61,28 +67,46 @@ impl DistinctChangeValue {
 
 pub struct Distinct<T, C> {
     sub_rel: Relation<T, C>,
-    current_counts: HashMap<T, ValueCount>,
+    current_counts: E1Map<T, ValueCount>,
     changed: HashMap<T, DistinctChange>,
+}
+
+impl<T, C> Distinct<T, C> {
+    pub fn new(sub_rel: Relation<T, C>) -> Self {
+        Self {
+            sub_rel,
+            current_counts: E1Map::default(),
+            changed: HashMap::default(),
+        }
+    }
 }
 
 impl<T: Clone + Eq + Hash, C: Op<T>> Op<T> for Distinct<T, C> {
     fn foreach(&mut self, mut f: impl FnMut(T, ValueCount)) {
-        self.sub_rel.foreach(|value, count| {
-            let cur_count = self.current_counts.entry(value.clone()).or_default();
-            let was_zero = cur_count.count == 0;
-            *cur_count += count;
-            let is_zero = cur_count.count == 0;
-            let commit_id = cur_count.commit_id;
-            if is_zero {
-                self.current_counts.remove(&value);
-            }
-            match (was_zero, is_zero) {
-                (true, false) => self.changed.entry(value).or_default().add(commit_id),
-                (false, true) => self.changed.entry(value).or_default().remove(commit_id),
-                (true, true) => panic!("zero count"),
-                (false, false) => (),
-            }
-        });
+        self.sub_rel.foreach(
+            |value, count| match self.current_counts.add(value.clone(), count) {
+                ValueChanges {
+                    was_zero: true,
+                    is_zero: false,
+                } => self.changed.entry(value).or_default().add(count.commit_id),
+                ValueChanges {
+                    was_zero: false,
+                    is_zero: true,
+                } => self
+                    .changed
+                    .entry(value)
+                    .or_default()
+                    .remove(count.commit_id),
+                ValueChanges {
+                    was_zero: true,
+                    is_zero: true,
+                } => panic!("zero count"),
+                ValueChanges {
+                    was_zero: false,
+                    is_zero: false,
+                } => (),
+            },
+        );
         self.changed.drain().for_each(|(value, change)| {
             let count = change.count();
             if count.count != 0 {

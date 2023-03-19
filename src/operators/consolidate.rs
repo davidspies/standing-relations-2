@@ -7,6 +7,15 @@ pub struct Consolidate<T, C> {
     scratch_space: E1Map<T, ValueCount>,
 }
 
+impl<T, C> Consolidate<T, C> {
+    pub fn new(sub_rel: Relation<T, C>) -> Self {
+        Self {
+            sub_rel,
+            scratch_space: E1Map::default(),
+        }
+    }
+}
+
 impl<T: Eq + Hash, C: Op<T>> Op<T> for Consolidate<T, C> {
     fn foreach(&mut self, mut f: impl FnMut(T, ValueCount)) {
         self.sub_rel.foreach(|value, count| {

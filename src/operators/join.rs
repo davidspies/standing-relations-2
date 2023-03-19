@@ -9,6 +9,17 @@ pub struct InnerJoin<K, VL, CL, VR, CR> {
     right_values: E1Map<K, E1Map<VR, ValueCount>>,
 }
 
+impl<K, VL, CL, VR, CR> InnerJoin<K, VL, CL, VR, CR> {
+    pub fn new(left_rel: Relation<(K, VL), CL>, right_rel: Relation<(K, VR), CR>) -> Self {
+        Self {
+            left_rel,
+            right_rel,
+            left_values: E1Map::default(),
+            right_values: E1Map::default(),
+        }
+    }
+}
+
 impl<K, VL, CL, VR, CR> Op<(K, VL, VR)> for InnerJoin<K, VL, CL, VR, CR>
 where
     K: Eq + Hash + Clone,
