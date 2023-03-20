@@ -34,11 +34,16 @@ pub struct SavedOp<T, C> {
 
 impl<T, C> Saved<T, C> {
     pub fn get(&self) -> Relation<T, SavedOp<T, C>> {
-        let receiver = self.0.borrow_mut().sender.receiver();
-        Relation::new(SavedOp {
-            inner: self.0.clone(),
-            receiver,
-        })
+        let mut inner = self.0.borrow_mut();
+        let receiver = inner.sender.receiver();
+        let context_id = inner.sub_rel.context_id();
+        Relation::new(
+            context_id,
+            SavedOp {
+                inner: self.0.clone(),
+                receiver,
+            },
+        )
     }
 }
 

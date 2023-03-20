@@ -7,7 +7,19 @@ use crate::{
 
 pub struct Input<T>(Sender<(T, ValueCount)>);
 
+impl<T> Input<T> {
+    pub(crate) fn new(sender: Sender<(T, ValueCount)>) -> Self {
+        Self(sender)
+    }
+}
+
 pub struct InputOp<T>(Receiver<(T, ValueCount)>);
+
+impl<T> InputOp<T> {
+    pub(crate) fn new(receiver: Receiver<(T, ValueCount)>) -> Self {
+        Self(receiver)
+    }
+}
 
 impl<T> Op<T> for InputOp<T> {
     fn foreach(&mut self, _current_id: CommitId, mut f: impl FnMut(T, ValueCount)) {

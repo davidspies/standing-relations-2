@@ -7,6 +7,7 @@ pub struct Concat<T, CL, CR> {
 
 impl<T, CL, CR> Concat<T, CL, CR> {
     pub fn new(left: Relation<T, CL>, right: Relation<T, CR>) -> Self {
+        assert_eq!(left.context_id(), right.context_id());
         Self { left, right }
     }
 }

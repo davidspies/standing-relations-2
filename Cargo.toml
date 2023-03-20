@@ -8,3 +8,4 @@ edition = "2021"
 [dependencies]
 derivative = "*"
 slice-group-by = "*"
+uuid = { version = "*", features = ["v4"] }

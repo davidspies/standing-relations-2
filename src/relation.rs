@@ -4,6 +4,7 @@ use std::{convert::identity, hash::Hash, iter, marker::PhantomData};
 
 use crate::{
     commit_id::CommitId,
+    context::ContextId,
     e1map::E1Map,
     op::{DynOp, Op},
     operators::{
@@ -23,15 +24,21 @@ use crate::{
 
 pub struct Relation<T, C> {
     phantom: PhantomData<T>,
+    context_id: ContextId,
     operator: C,
 }
 
 impl<T, C> Relation<T, C> {
-    pub(crate) fn new(operator: C) -> Self {
+    pub(crate) fn new(context_id: ContextId, operator: C) -> Self {
         Self {
             phantom: PhantomData,
+            context_id,
             operator,
         }
+    }
+
+    pub(crate) fn context_id(&self) -> ContextId {
+        self.context_id
     }
 
     pub(crate) fn foreach(&mut self, current_id: CommitId, f: impl FnMut(T, ValueCount))
@@ -45,27 +52,27 @@ impl<T, C> Relation<T, C> {
     where
         C: Op<T> + 'a,
     {
-        Relation::new(Box::new(self.operator))
+        Relation::new(self.context_id, Box::new(self.operator))
     }
 
     pub fn flat_map<U, F>(self, f: F) -> Relation<U, FlatMap<T, F, C>> {
-        Relation::new(FlatMap::new(self, f))
+        Relation::new(self.context_id, FlatMap::new(self, f))
     }
 
     pub fn distinct(self) -> Relation<T, Distinct<T, C>> {
-        Relation::new(Distinct::new(self))
+        Relation::new(self.context_id, Distinct::new(self))
     }
 
     pub fn consolidate(self) -> Relation<T, Consolidate<T, C>> {
-        Relation::new(Consolidate::new(self))
+        Relation::new(self.context_id, Consolidate::new(self))
     }
 
     pub fn concat<CR>(self, other: Relation<T, CR>) -> Relation<T, Concat<T, C, CR>> {
-        Relation::new(Concat::new(self, other))
+        Relation::new(self.context_id, Concat::new(self, other))
     }
 
     pub fn negate(self) -> Relation<T, Negate<T, C>> {
-        Relation::new(Negate::new(self))
+        Relation::new(self.context_id, Negate::new(self))
     }
 
     pub fn save(self) -> Saved<T, C> {
@@ -113,18 +120,18 @@ impl<K, V, C> Relation<(K, V), C> {
         self,
         other: Relation<(K, VR), CR>,
     ) -> Relation<(K, V, VR), InnerJoin<K, V, C, VR, CR>> {
-        Relation::new(InnerJoin::new(self, other))
+        Relation::new(self.context_id, InnerJoin::new(self, other))
     }
 
     pub fn reduce<Y, F>(self, f: F) -> Relation<(K, Y), Reduce<K, V, Y, F, C>> {
-        Relation::new(Reduce::new(self, f))
+        Relation::new(self.context_id, Reduce::new(self, f))
     }
 
     pub fn antijoin<CR: Op<K>>(
         self,
         other: Relation<K, CR>,
     ) -> Relation<(K, V), AntiJoin<K, V, C, CR>> {
-        Relation::new(AntiJoin::new(self, other))
+        Relation::new(self.context_id, AntiJoin::new(self, other))
     }
 
     pub fn semijoin(self, other: Relation<K, impl Op<K>>) -> Relation<(K, V), impl Op<(K, V)>>
@@ -144,8 +151,12 @@ impl<L, R, C> Relation<(L, R), C> {
         Relation<L, SplitOp<L, L, R, C>>,
         Relation<R, SplitOp<R, L, R, C>>,
     ) {
+        let context_id = self.context_id;
         let Split { left, right } = Split::new(self);
-        (Relation::new(left), Relation::new(right))
+        (
+            Relation::new(context_id, left),
+            Relation::new(context_id, right),
+        )
     }
     pub fn fsts(self) -> Relation<L, impl Op<L>>
     where

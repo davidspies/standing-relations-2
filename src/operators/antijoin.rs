@@ -14,6 +14,7 @@ pub struct AntiJoin<K, V, CL, CR> {
 
 impl<K, V, CL, CR> AntiJoin<K, V, CL, CR> {
     pub fn new(left_rel: Relation<(K, V), CL>, right_rel: Relation<K, CR>) -> Self {
+        assert_eq!(left_rel.context_id(), right_rel.context_id());
         Self {
             left_rel,
             right_rel,
