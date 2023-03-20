@@ -82,7 +82,7 @@ impl<K: Eq + Hash, V> E1Map<K, V> {
                 }
             }
             None => {
-                if self.non_singleton.capacity() == 0 {
+                if self.non_singleton.is_empty() {
                     self.singleton = Some((key, V::default()));
                     let v = &mut self.singleton.as_mut().unwrap().1;
                     let result = value.add_to(v);
