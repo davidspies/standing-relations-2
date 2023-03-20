@@ -57,7 +57,7 @@ impl<T: Clone, C: Op<T>> Op<T> for SavedOp<T, C> {
                 last_id,
             } = &mut *inner;
             if *last_id < current_id {
-                sub_rel.foreach(current_id, |t, count| sender.send((t, count)));
+                sub_rel.foreach(current_id, |t, count| sender.send(&(t, count)));
                 *last_id = current_id
             }
         }

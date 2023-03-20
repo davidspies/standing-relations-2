@@ -19,7 +19,7 @@ impl<T> Sender<T> {
         self.0.borrow_mut().push(sender);
         receiver
     }
-    pub fn send(&mut self, value: T)
+    pub fn send(&mut self, value: &T)
     where
         T: Clone,
     {
