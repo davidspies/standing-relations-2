@@ -9,6 +9,9 @@ use crate::{
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct ContextId(Uuid);
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+pub struct CommitId(usize);
+
 pub struct CreationContext {
     id: ContextId,
 }

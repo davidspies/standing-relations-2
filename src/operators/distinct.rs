@@ -1,7 +1,7 @@
 use std::{collections::HashMap, hash::Hash};
 
 use crate::{
-    add_to_value::ValueChanges, commit_id::CommitId, e1map::E1Map, op::Op, relation::Relation,
+    add_to_value::ValueChanges, context::CommitId, e1map::E1Map, op::Op, relation::Relation,
     value_count::ValueCount,
 };
 
@@ -32,7 +32,7 @@ impl<T: Clone + Eq + Hash, C: Op<T>> Op<T> for Distinct<T, C> {
                     .changed_scratch
                     .entry(value)
                     .or_default()
-                    .add(count.commit_id),
+                    .add(count.context),
                 ValueChanges {
                     was_zero: false,
                     is_zero: true,
@@ -40,7 +40,7 @@ impl<T: Clone + Eq + Hash, C: Op<T>> Op<T> for Distinct<T, C> {
                     .changed_scratch
                     .entry(value)
                     .or_default()
-                    .remove(count.commit_id),
+                    .remove(count.context),
                 ValueChanges {
                     was_zero: true,
                     is_zero: true,
@@ -62,23 +62,23 @@ impl<T: Clone + Eq + Hash, C: Op<T>> Op<T> for Distinct<T, C> {
 
 #[derive(Default)]
 struct DistinctChange {
-    commit_id: CommitId,
+    context: CommitId,
     value: DistinctChangeValue,
 }
 
 impl DistinctChange {
-    fn add(&mut self, commit_id: CommitId) {
-        self.commit_id = self.commit_id.max(commit_id);
+    fn add(&mut self, context: CommitId) {
+        self.context = self.context.max(context);
         self.value.add()
     }
-    fn remove(&mut self, commit_id: CommitId) {
-        self.commit_id = self.commit_id.max(commit_id);
+    fn remove(&mut self, context: CommitId) {
+        self.context = self.context.max(context);
         self.value.remove()
     }
 
     fn count(&self) -> ValueCount {
         ValueCount {
-            commit_id: self.commit_id,
+            context: self.context,
             count: self.value.count(),
         }
     }

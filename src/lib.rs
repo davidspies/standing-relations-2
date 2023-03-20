@@ -8,7 +8,6 @@ pub use self::value_count::ValueCount;
 mod add_to_value;
 mod broadcast_channel;
 mod channel;
-mod commit_id;
 mod context;
 mod e1map;
 mod nullable;

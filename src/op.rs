@@ -1,4 +1,4 @@
-use crate::{commit_id::CommitId, value_count::ValueCount};
+use crate::{context::CommitId, value_count::ValueCount};
 
 pub trait Op<T> {
     fn foreach(&mut self, current_id: CommitId, f: impl FnMut(T, ValueCount));

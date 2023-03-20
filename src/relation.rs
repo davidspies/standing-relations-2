@@ -3,8 +3,7 @@
 use std::{convert::identity, hash::Hash, iter, marker::PhantomData};
 
 use crate::{
-    commit_id::CommitId,
-    context::ContextId,
+    context::{CommitId, ContextId},
     e1map::E1Map,
     op::{DynOp, Op},
     operators::{

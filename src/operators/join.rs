@@ -1,8 +1,6 @@
 use std::hash::Hash;
 
-use crate::{
-    commit_id::CommitId, e1map::E1Map, op::Op, relation::Relation, value_count::ValueCount,
-};
+use crate::{context::CommitId, e1map::E1Map, op::Op, relation::Relation, value_count::ValueCount};
 
 pub struct InnerJoin<K, VL, CL, VR, CR> {
     left_rel: Relation<(K, VL), CL>,

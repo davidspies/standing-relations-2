@@ -2,29 +2,23 @@ use std::ops::{Add, AddAssign, Mul, Neg};
 
 use crate::{
     add_to_value::{AddToValue, ValueChanges},
-    commit_id::CommitId,
+    context::CommitId,
     nullable::Nullable,
 };
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct ValueCount {
-    pub(crate) commit_id: CommitId,
+    pub(crate) context: CommitId,
     pub(crate) count: isize,
 }
 
 impl ValueCount {
-    pub fn decr(commit_id: CommitId) -> Self {
-        Self {
-            commit_id,
-            count: -1,
-        }
+    pub fn decr(context: CommitId) -> Self {
+        Self { context, count: -1 }
     }
 
-    pub fn incr(commit_id: CommitId) -> Self {
-        Self {
-            commit_id,
-            count: 1,
-        }
+    pub fn incr(context: CommitId) -> Self {
+        Self { context, count: 1 }
     }
 
     pub fn count(&self) -> isize {
@@ -37,7 +31,7 @@ impl Add for ValueCount {
 
     fn add(self, rhs: Self) -> Self::Output {
         Self {
-            commit_id: self.commit_id.max(rhs.commit_id),
+            context: self.context.max(rhs.context),
             count: self.count + rhs.count,
         }
     }
@@ -54,7 +48,7 @@ impl Mul for ValueCount {
 
     fn mul(self, rhs: Self) -> Self::Output {
         Self {
-            commit_id: self.commit_id.max(rhs.commit_id),
+            context: self.context.max(rhs.context),
             count: self.count * rhs.count,
         }
     }
@@ -65,7 +59,7 @@ impl Neg for ValueCount {
 
     fn neg(self) -> Self::Output {
         Self {
-            commit_id: self.commit_id,
+            context: self.context,
             count: -self.count,
         }
     }

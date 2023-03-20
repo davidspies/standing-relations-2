@@ -1,4 +1,4 @@
-use crate::{commit_id::CommitId, op::Op, relation::Relation, value_count::ValueCount};
+use crate::{context::CommitId, op::Op, relation::Relation, value_count::ValueCount};
 
 pub struct Negate<T, C> {
     sub_rel: Relation<T, C>,

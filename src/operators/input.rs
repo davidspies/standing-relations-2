@@ -1,6 +1,6 @@
 use crate::{
     channel::{Receiver, Sender},
-    commit_id::CommitId,
+    context::CommitId,
     op::Op,
     value_count::ValueCount,
 };

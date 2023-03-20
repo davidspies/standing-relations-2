@@ -4,9 +4,7 @@ use std::{
     mem,
 };
 
-use crate::{
-    commit_id::CommitId, e1map::E1Map, op::Op, relation::Relation, value_count::ValueCount,
-};
+use crate::{context::CommitId, e1map::E1Map, op::Op, relation::Relation, value_count::ValueCount};
 
 pub struct Reduce<K, V, Y, F, C> {
     sub_rel: Relation<(K, V), C>,
@@ -39,29 +37,29 @@ where
     fn foreach(&mut self, current_id: CommitId, mut f: impl FnMut((K, Y), ValueCount)) {
         self.sub_rel.foreach(current_id, |(k, v), count| {
             self.aggregated_values.add(k.clone(), (v, count));
-            let commit_id = self.changed_keys_scratch.entry(k).or_default();
-            *commit_id = (*commit_id).max(count.commit_id);
+            let context = self.changed_keys_scratch.entry(k).or_default();
+            *context = (*context).max(count.context);
         });
-        for (k, commit_id) in self.changed_keys_scratch.drain() {
+        for (k, context) in self.changed_keys_scratch.drain() {
             match self.aggregated_values.get(&k) {
                 None => {
-                    if let Some((commit_id, y)) = self.outputs.remove(&k) {
-                        f((k, y), ValueCount::decr(commit_id))
+                    if let Some((context, y)) = self.outputs.remove(&k) {
+                        f((k, y), ValueCount::decr(context))
                     }
                 }
                 Some(vals) => {
                     let new_y = (self.f)(&k, vals);
                     match self.outputs.entry(k.clone()) {
                         hash_map::Entry::Vacant(vac) => {
-                            vac.insert((commit_id, new_y.clone()));
-                            f((k, new_y), ValueCount::incr(commit_id));
+                            vac.insert((context, new_y.clone()));
+                            f((k, new_y), ValueCount::incr(context));
                         }
                         hash_map::Entry::Occupied(mut occ) => {
                             let out = occ.get_mut();
                             if new_y != out.1 {
-                                let (_, old_y) = mem::replace(out, (commit_id, new_y.clone()));
-                                f((k.clone(), old_y), ValueCount::decr(commit_id));
-                                f((k, new_y), ValueCount::incr(commit_id));
+                                let (_, old_y) = mem::replace(out, (context, new_y.clone()));
+                                f((k.clone(), old_y), ValueCount::decr(context));
+                                f((k, new_y), ValueCount::incr(context));
                             }
                         }
                     }
