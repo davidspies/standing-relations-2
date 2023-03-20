@@ -61,7 +61,7 @@ where
             }
         });
         self.left_rel.foreach(current_id, |(k, v), count| {
-            if self.right_values.get(&k).is_none() {
+            if !self.right_values.contains_key(&k) {
                 f((k.clone(), v.clone()), count);
             }
             self.left_values.add(k, (v, count));

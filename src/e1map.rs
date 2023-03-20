@@ -34,10 +34,23 @@ impl<K, V> E1Map<K, V> {
             .chain(self.non_singleton.iter())
     }
 
-    pub fn get(&self, key: &K) -> Option<&V>
-    where
-        K: Eq + Hash,
-    {
+    pub(crate) fn drain(&mut self) -> impl Iterator<Item = (K, V)> + '_ {
+        self.singleton
+            .take()
+            .into_iter()
+            .chain(self.non_singleton.drain())
+    }
+}
+
+impl<K: Eq + Hash, V> E1Map<K, V> {
+    pub fn contains_key(&self, key: &K) -> bool {
+        match &self.singleton {
+            Some((k, _)) => key == k,
+            None => self.non_singleton.contains_key(key),
+        }
+    }
+
+    pub fn get(&self, key: &K) -> Option<&V> {
         match &self.singleton {
             Some((k, v)) => (key == k).then_some(v),
             None => self.non_singleton.get(key),
@@ -46,7 +59,6 @@ impl<K, V> E1Map<K, V> {
 
     pub(crate) fn add(&mut self, key: K, value: impl AddToValue<V>) -> ValueChanges
     where
-        K: Eq + Hash,
         V: Nullable,
     {
         match self.singleton.take() {
@@ -100,13 +112,6 @@ impl<K, V> E1Map<K, V> {
                 }
             }
         }
-    }
-
-    pub(crate) fn drain(&mut self) -> impl Iterator<Item = (K, V)> + '_ {
-        self.singleton
-            .take()
-            .into_iter()
-            .chain(self.non_singleton.drain())
     }
 }
 
