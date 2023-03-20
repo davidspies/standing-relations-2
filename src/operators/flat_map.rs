@@ -1,4 +1,4 @@
-use crate::{op::Op, relation::Relation, value_count::ValueCount};
+use crate::{commit_id::CommitId, op::Op, relation::Relation, value_count::ValueCount};
 
 pub struct FlatMap<S, F, C> {
     sub_rel: Relation<S, C>,
@@ -17,8 +17,8 @@ where
     F: Fn(S) -> I,
     C: Op<S>,
 {
-    fn foreach(&mut self, mut f: impl FnMut(T, ValueCount)) {
-        self.sub_rel.foreach(|x, count| {
+    fn foreach(&mut self, current_id: CommitId, mut f: impl FnMut(T, ValueCount)) {
+        self.sub_rel.foreach(current_id, |x, count| {
             for y in (self.f)(x) {
                 f(y, count)
             }

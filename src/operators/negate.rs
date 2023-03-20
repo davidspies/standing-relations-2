@@ -1,4 +1,4 @@
-use crate::{op::Op, value_count::ValueCount, relation::Relation};
+use crate::{commit_id::CommitId, op::Op, relation::Relation, value_count::ValueCount};
 
 pub struct Negate<T, C> {
     sub_rel: Relation<T, C>,
@@ -11,7 +11,8 @@ impl<T, C> Negate<T, C> {
 }
 
 impl<T, C: Op<T>> Op<T> for Negate<T, C> {
-    fn foreach(&mut self, mut f: impl FnMut(T, ValueCount)) {
-        self.sub_rel.foreach(|value, count| f(value, -count))
+    fn foreach(&mut self, current_id: CommitId, mut f: impl FnMut(T, ValueCount)) {
+        self.sub_rel
+            .foreach(current_id, |value, count| f(value, -count))
     }
 }

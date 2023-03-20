@@ -1,7 +1,8 @@
 use std::hash::Hash;
 
 use crate::{
-    add_to_value::ValueChanges, e1map::E1Map, op::Op, relation::Relation, value_count::ValueCount,
+    add_to_value::ValueChanges, commit_id::CommitId, e1map::E1Map, op::Op, relation::Relation,
+    value_count::ValueCount,
 };
 
 pub struct AntiJoin<K, V, CL, CR> {
@@ -29,9 +30,9 @@ where
     CL: Op<(K, V)>,
     CR: Op<K>,
 {
-    fn foreach(&mut self, mut f: impl FnMut((K, V), ValueCount)) {
-        self.right_rel
-            .foreach(|k, count| match self.right_values.add(k.clone(), count) {
+    fn foreach(&mut self, current_id: CommitId, mut f: impl FnMut((K, V), ValueCount)) {
+        self.right_rel.foreach(current_id, |k, count| {
+            match self.right_values.add(k.clone(), count) {
                 ValueChanges {
                     was_zero: true,
                     is_zero: false,
@@ -56,8 +57,9 @@ where
                     was_zero: false,
                     is_zero: false,
                 } => (),
-            });
-        self.left_rel.foreach(|(k, v), count| {
+            }
+        });
+        self.left_rel.foreach(current_id, |(k, v), count| {
             if self.right_values.get(&k).is_none() {
                 f((k.clone(), v.clone()), count);
             }

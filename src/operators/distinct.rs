@@ -22,13 +22,17 @@ impl<T, C> Distinct<T, C> {
 }
 
 impl<T: Clone + Eq + Hash, C: Op<T>> Op<T> for Distinct<T, C> {
-    fn foreach(&mut self, mut f: impl FnMut(T, ValueCount)) {
-        self.sub_rel.foreach(
-            |value, count| match self.current_counts.add(value.clone(), count) {
+    fn foreach(&mut self, current_id: CommitId, mut f: impl FnMut(T, ValueCount)) {
+        self.sub_rel.foreach(current_id, |value, count| {
+            match self.current_counts.add(value.clone(), count) {
                 ValueChanges {
                     was_zero: true,
                     is_zero: false,
-                } => self.changed_scratch.entry(value).or_default().add(count.commit_id),
+                } => self
+                    .changed_scratch
+                    .entry(value)
+                    .or_default()
+                    .add(count.commit_id),
                 ValueChanges {
                     was_zero: false,
                     is_zero: true,
@@ -45,8 +49,8 @@ impl<T: Clone + Eq + Hash, C: Op<T>> Op<T> for Distinct<T, C> {
                     was_zero: false,
                     is_zero: false,
                 } => (),
-            },
-        );
+            }
+        });
         self.changed_scratch.drain().for_each(|(value, change)| {
             let count = change.count();
             if count.count != 0 {

@@ -8,4 +8,5 @@ edition = "2021"
 [dependencies]
 crossbeam-channel = "*"
 derivative = "*"
+parking_lot = "*"
 slice-group-by = "*"

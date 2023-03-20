@@ -36,8 +36,8 @@ where
     F: Fn(&K, &E1Map<V, ValueCount>) -> Y,
     C: Op<(K, V)>,
 {
-    fn foreach(&mut self, mut f: impl FnMut((K, Y), ValueCount)) {
-        self.sub_rel.foreach(|(k, v), count| {
+    fn foreach(&mut self, current_id: CommitId, mut f: impl FnMut((K, Y), ValueCount)) {
+        self.sub_rel.foreach(current_id, |(k, v), count| {
             self.aggregated_values.add(k.clone(), (v, count));
             let commit_id = self.changed_keys_scratch.entry(k).or_default();
             *commit_id = (*commit_id).max(count.commit_id);

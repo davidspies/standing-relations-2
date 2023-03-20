@@ -1,6 +1,8 @@
 use std::hash::Hash;
 
-use crate::{e1map::E1Map, op::Op, relation::Relation, value_count::ValueCount};
+use crate::{
+    commit_id::CommitId, e1map::E1Map, op::Op, relation::Relation, value_count::ValueCount,
+};
 
 pub struct Consolidate<T, C> {
     sub_rel: Relation<T, C>,
@@ -17,8 +19,8 @@ impl<T, C> Consolidate<T, C> {
 }
 
 impl<T: Eq + Hash, C: Op<T>> Op<T> for Consolidate<T, C> {
-    fn foreach(&mut self, mut f: impl FnMut(T, ValueCount)) {
-        self.sub_rel.foreach(|value, count| {
+    fn foreach(&mut self, current_id: CommitId, mut f: impl FnMut(T, ValueCount)) {
+        self.sub_rel.foreach(current_id, |value, count| {
             self.collected_scratch.add(value, count);
         });
         self.collected_scratch
