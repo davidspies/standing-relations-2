@@ -1,3 +1,5 @@
+use std::{cell::Cell, rc::Rc};
+
 use uuid::Uuid;
 
 use crate::{
@@ -30,10 +32,20 @@ impl CreationContext {
         )
     }
     pub fn begin(self) -> ExecutionContext {
-        ExecutionContext { id: self.id }
+        ExecutionContext {
+            id: self.id,
+            next_commit_id: Rc::new(Cell::new(1)),
+        }
     }
 }
 
 pub struct ExecutionContext {
     id: ContextId,
+    next_commit_id: Rc<Cell<usize>>,
+}
+
+impl ExecutionContext {
+    pub fn commit(&mut self) {
+        self.next_commit_id.set(self.next_commit_id.get() + 1);
+    }
 }

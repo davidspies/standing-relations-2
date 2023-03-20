@@ -2,15 +2,25 @@ use std::{
     cell::RefCell,
     collections::VecDeque,
     rc::{Rc, Weak},
+    vec,
 };
 
 pub struct Sender<T>(Weak<RefCell<VecDeque<T>>>);
 
-pub struct Receiver<T>(Rc<RefCell<VecDeque<T>>>);
+pub struct Receiver<T> {
+    queue: Rc<RefCell<VecDeque<T>>>,
+    iter_scratch: Vec<T>,
+}
 
 pub fn new<T>() -> (Sender<T>, Receiver<T>) {
-    let result = Rc::new(RefCell::new(VecDeque::new()));
-    (Sender(Rc::downgrade(&result)), Receiver(result))
+    let queue = Rc::new(RefCell::new(VecDeque::new()));
+    (
+        Sender(Rc::downgrade(&queue)),
+        Receiver {
+            queue,
+            iter_scratch: Vec::new(),
+        },
+    )
 }
 
 impl<T> Sender<T> {
@@ -27,9 +37,10 @@ impl<T> Sender<T> {
 
 impl<T> Receiver<T> {
     pub fn try_recv(&mut self) -> Option<T> {
-        self.0.borrow_mut().pop_front()
+        self.queue.borrow_mut().pop_front()
     }
-    pub fn try_for_each(&mut self, f: impl FnMut(T)) {
-        self.0.borrow_mut().drain(..).for_each(f)
+    pub fn try_iter(&mut self) -> vec::Drain<T> {
+        self.iter_scratch.extend(self.queue.borrow_mut().drain(..));
+        self.iter_scratch.drain(..)
     }
 }

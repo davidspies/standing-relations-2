@@ -61,6 +61,6 @@ impl<T: Clone, C: Op<T>> Op<T> for SavedOp<T, C> {
                 *last_id = current_id
             }
         }
-        self.receiver.try_for_each(|(t, count)| f(t, count))
+        self.receiver.try_iter().for_each(|(t, count)| f(t, count))
     }
 }
