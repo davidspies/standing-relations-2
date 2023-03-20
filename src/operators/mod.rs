@@ -8,3 +8,4 @@ pub mod negate;
 pub mod reduce;
 pub mod save;
 pub mod split;
+pub mod input;
