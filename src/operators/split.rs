@@ -1,9 +1,12 @@
-use std::sync::Arc;
+use std::{cell::RefCell, rc::Rc};
 
-use crossbeam_channel::{Receiver, Sender};
-use parking_lot::RwLock;
-
-use crate::{commit_id::CommitId, op::Op, relation::Relation, value_count::ValueCount};
+use crate::{
+    channel::{self, Receiver, Sender},
+    commit_id::CommitId,
+    op::Op,
+    relation::Relation,
+    value_count::ValueCount,
+};
 
 struct SplitInner<L, R, C> {
     last_id: CommitId,
@@ -19,9 +22,9 @@ pub(crate) struct Split<L, R, C> {
 
 impl<L, R, C> Split<L, R, C> {
     pub(crate) fn new(sub_rel: Relation<(L, R), C>) -> Self {
-        let (left_sender, left_receiver) = crossbeam_channel::unbounded();
-        let (right_sender, right_receiver) = crossbeam_channel::unbounded();
-        let inner = Arc::new(RwLock::new(SplitInner {
+        let (left_sender, left_receiver) = channel::new();
+        let (right_sender, right_receiver) = channel::new();
+        let inner = Rc::new(RefCell::new(SplitInner {
             last_id: CommitId::default(),
             sub_rel,
             left_sender,
@@ -41,28 +44,26 @@ impl<L, R, C> Split<L, R, C> {
 }
 
 pub struct SplitOp<T, L, R, C> {
-    inner: Arc<RwLock<SplitInner<L, R, C>>>,
+    inner: Rc<RefCell<SplitInner<L, R, C>>>,
     receiver: Receiver<(T, ValueCount)>,
 }
 
 impl<T, L, R, C: Op<(L, R)>> Op<T> for SplitOp<T, L, R, C> {
     fn foreach(&mut self, current_id: CommitId, mut f: impl FnMut(T, ValueCount)) {
-        if self.inner.read().last_id < current_id {
-            let mut inner = self.inner.write();
-            let SplitInner {
-                sub_rel,
-                left_sender,
-                right_sender,
-                last_id,
-            } = &mut *inner;
-            if *last_id < current_id {
-                sub_rel.foreach(current_id, |(l, r), count| {
-                    let _ = left_sender.send((l, count));
-                    let _ = right_sender.send((r, count));
-                });
-                *last_id = current_id
-            }
+        let mut inner = self.inner.borrow_mut();
+        let SplitInner {
+            sub_rel,
+            left_sender,
+            right_sender,
+            last_id,
+        } = &mut *inner;
+        if *last_id < current_id {
+            sub_rel.foreach(current_id, |(l, r), count| {
+                let _ = left_sender.send((l, count));
+                let _ = right_sender.send((r, count));
+            });
+            *last_id = current_id
         }
-        self.receiver.try_iter().for_each(|(t, count)| f(t, count))
+        self.receiver.try_for_each(|(t, count)| f(t, count))
     }
 }

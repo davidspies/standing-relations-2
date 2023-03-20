@@ -1,6 +1,4 @@
-use std::sync::Arc;
-
-use parking_lot::RwLock;
+use std::{cell::RefCell, rc::Rc};
 
 use crate::{
     broadcast_channel::{Receiver, Sender},
@@ -16,12 +14,12 @@ struct SavedInner<T, C> {
     sender: Sender<(T, ValueCount)>,
 }
 
-pub struct Saved<T, C>(Arc<RwLock<SavedInner<T, C>>>);
+pub struct Saved<T, C>(Rc<RefCell<SavedInner<T, C>>>);
 
 impl<T, C> Saved<T, C> {
     pub(crate) fn new(sub_rel: Relation<T, C>) -> Self {
         let sender = Sender::new();
-        Self(Arc::new(RwLock::new(SavedInner {
+        Self(Rc::new(RefCell::new(SavedInner {
             last_id: CommitId::default(),
             sub_rel,
             sender,
@@ -30,13 +28,13 @@ impl<T, C> Saved<T, C> {
 }
 
 pub struct SavedOp<T, C> {
-    inner: Arc<RwLock<SavedInner<T, C>>>,
+    inner: Rc<RefCell<SavedInner<T, C>>>,
     receiver: Receiver<(T, ValueCount)>,
 }
 
 impl<T, C> Saved<T, C> {
     pub fn get(&self) -> Relation<T, SavedOp<T, C>> {
-        let receiver = self.0.write().sender.receiver();
+        let receiver = self.0.borrow_mut().sender.receiver();
         Relation::new(SavedOp {
             inner: self.0.clone(),
             receiver,
@@ -46,8 +44,8 @@ impl<T, C> Saved<T, C> {
 
 impl<T: Clone, C: Op<T>> Op<T> for SavedOp<T, C> {
     fn foreach(&mut self, current_id: CommitId, mut f: impl FnMut(T, ValueCount)) {
-        if self.inner.read().last_id < current_id {
-            let mut inner = self.inner.write();
+        if self.inner.borrow().last_id < current_id {
+            let mut inner = self.inner.borrow_mut();
             let SavedInner {
                 sub_rel,
                 sender,
@@ -58,6 +56,6 @@ impl<T: Clone, C: Op<T>> Op<T> for SavedOp<T, C> {
                 *last_id = current_id
             }
         }
-        self.receiver.try_iter().for_each(|(t, count)| f(t, count))
+        self.receiver.try_for_each(|(t, count)| f(t, count))
     }
 }
