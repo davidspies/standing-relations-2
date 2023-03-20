@@ -14,7 +14,7 @@ impl<T> Sender<T> {
     pub fn new() -> Self {
         Self::default()
     }
-    pub fn receiver(&mut self) -> Receiver<T> {
+    pub fn subscribe(&mut self) -> Receiver<T> {
         let (sender, receiver) = channel::new();
         self.0.borrow_mut().push(sender);
         receiver
