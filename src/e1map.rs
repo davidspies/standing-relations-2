@@ -22,6 +22,10 @@ pub struct E1Map<K, V> {
 pub type Iter<'a, K, V> = Chain<option::IntoIter<(&'a K, &'a V)>, hash_map::Iter<'a, K, V>>;
 
 impl<K, V> E1Map<K, V> {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
     pub fn is_empty(&self) -> bool {
         self.singleton.is_none() && self.non_singleton.is_empty()
     }

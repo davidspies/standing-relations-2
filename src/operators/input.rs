@@ -5,11 +5,15 @@ use crate::{
     value_count::ValueCount,
 };
 
-pub struct Input<T>(Sender<(T, ValueCount)>);
+pub struct Input<T>(Sender<(T, isize)>);
 
 impl<T> Input<T> {
-    pub(crate) fn new(sender: Sender<(T, ValueCount)>) -> Self {
+    pub(crate) fn new(sender: Sender<(T, isize)>) -> Self {
         Self(sender)
+    }
+
+    pub(crate) fn send_with_count(&mut self, elem: T, count: isize) -> Result<(), (T, isize)> {
+        self.0.send((elem, count))
     }
 }
 

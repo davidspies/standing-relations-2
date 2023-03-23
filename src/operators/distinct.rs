@@ -32,7 +32,7 @@ impl<T: Clone + Eq + Hash, C: Op<T>> Op<T> for Distinct<T, C> {
                     .changed_scratch
                     .entry(value)
                     .or_default()
-                    .add(count.context),
+                    .add(count.commit_id),
                 ValueChanges {
                     was_zero: false,
                     is_zero: true,
@@ -40,7 +40,7 @@ impl<T: Clone + Eq + Hash, C: Op<T>> Op<T> for Distinct<T, C> {
                     .changed_scratch
                     .entry(value)
                     .or_default()
-                    .remove(count.context),
+                    .remove(count.commit_id),
                 ValueChanges {
                     was_zero: true,
                     is_zero: true,
@@ -62,23 +62,23 @@ impl<T: Clone + Eq + Hash, C: Op<T>> Op<T> for Distinct<T, C> {
 
 #[derive(Default)]
 struct DistinctChange {
-    context: CommitId,
+    commit_id: CommitId,
     value: DistinctChangeValue,
 }
 
 impl DistinctChange {
     fn add(&mut self, context: CommitId) {
-        self.context = self.context.max(context);
+        self.commit_id = self.commit_id.max(context);
         self.value.add()
     }
-    fn remove(&mut self, context: CommitId) {
-        self.context = self.context.max(context);
+    fn remove(&mut self, commit_id: CommitId) {
+        self.commit_id = self.commit_id.max(commit_id);
         self.value.remove()
     }
 
     fn count(&self) -> ValueCount {
         ValueCount {
-            context: self.context,
+            commit_id: self.commit_id,
             count: self.value.count(),
         }
     }

@@ -37,8 +37,8 @@ where
     fn foreach(&mut self, current_id: CommitId, mut f: impl FnMut((K, Y), ValueCount)) {
         self.sub_rel.foreach(current_id, |(k, v), count| {
             self.aggregated_values.add(k.clone(), (v, count));
-            let context = self.changed_keys_scratch.entry(k).or_default();
-            *context = (*context).max(count.context);
+            let commit_id = self.changed_keys_scratch.entry(k).or_default();
+            *commit_id = (*commit_id).max(count.commit_id);
         });
         for (k, context) in self.changed_keys_scratch.drain() {
             match self.aggregated_values.get(&k) {
