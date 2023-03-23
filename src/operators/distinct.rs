@@ -52,8 +52,7 @@ impl<T: Clone + Eq + Hash, C: Op<T>> Op<T> for Distinct<T, C> {
             }
         });
         self.changed_scratch.drain().for_each(|(value, change)| {
-            let count = change.count();
-            if count.count != 0 {
+            if let Some(count) = change.count() {
                 f(value, count)
             }
         })
@@ -76,10 +75,11 @@ impl DistinctChange {
         self.value.remove()
     }
 
-    fn count(&self) -> ValueCount {
-        ValueCount {
-            commit_id: self.commit_id,
-            count: self.value.count(),
+    fn count(&self) -> Option<ValueCount> {
+        match self.value {
+            DistinctChangeValue::Removed => Some(ValueCount::decr(self.commit_id)),
+            DistinctChangeValue::NoChange => None,
+            DistinctChangeValue::Added => Some(ValueCount::incr(self.commit_id)),
         }
     }
 }
@@ -105,14 +105,6 @@ impl DistinctChangeValue {
             Self::NoChange => *self = Self::Removed,
             Self::Added => *self = Self::NoChange,
             Self::Removed => panic!("Already removed"),
-        }
-    }
-
-    fn count(&self) -> isize {
-        match self {
-            DistinctChangeValue::Removed => -1,
-            DistinctChangeValue::NoChange => 0,
-            DistinctChangeValue::Added => 1,
         }
     }
 }
