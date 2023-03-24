@@ -12,8 +12,12 @@ impl<T> Input<T> {
         Self(sender)
     }
 
-    pub(crate) fn send_with_count(&mut self, elem: T, count: isize) -> Result<(), (T, isize)> {
-        self.0.send((elem, count))
+    pub fn send(&mut self, elem: T) -> Result<(), T> {
+        self.0.send((elem, 1)).map_err(|(elem, _)| elem)
+    }
+
+    pub fn unsend(&mut self, elem: T) -> Result<(), T> {
+        self.0.send((elem, -1)).map_err(|(elem, _)| elem)
     }
 }
 

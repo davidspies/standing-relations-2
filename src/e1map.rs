@@ -21,6 +21,8 @@ pub struct E1Map<K, V> {
 
 pub type Iter<'a, K, V> = Chain<option::IntoIter<(&'a K, &'a V)>, hash_map::Iter<'a, K, V>>;
 
+pub type IntoIter<K, V> = Chain<option::IntoIter<(K, V)>, hash_map::IntoIter<K, V>>;
+
 impl<K, V> E1Map<K, V> {
     pub fn new() -> Self {
         Self::default()
@@ -36,6 +38,12 @@ impl<K, V> E1Map<K, V> {
             .map(|(k, v)| (k, v))
             .into_iter()
             .chain(self.non_singleton.iter())
+    }
+
+    pub fn into_iter(self) -> IntoIter<K, V> {
+        self.singleton
+            .into_iter()
+            .chain(self.non_singleton.into_iter())
     }
 
     pub(crate) fn drain(&mut self) -> impl Iterator<Item = (K, V)> + '_ {
@@ -126,6 +134,16 @@ impl<'a, K, V> IntoIterator for &'a E1Map<K, V> {
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
+    }
+}
+
+impl<K, V> IntoIterator for E1Map<K, V> {
+    type Item = (K, V);
+
+    type IntoIter = IntoIter<K, V>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.into_iter()
     }
 }
 
