@@ -12,7 +12,7 @@ use crate::{
     nullable::Nullable,
 };
 
-#[derive(Derivative)]
+#[derive(Debug, Derivative)]
 #[derivative(Default(bound = ""))]
 pub struct E1Map<K, V> {
     singleton: Option<(K, V)>,
