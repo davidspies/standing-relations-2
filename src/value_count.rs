@@ -8,8 +8,8 @@ use crate::{
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct ValueCount {
-    pub(crate) commit_id: CommitId,
-    pub(crate) count: isize,
+    pub commit_id: CommitId,
+    pub count: isize,
 }
 
 impl ValueCount {
