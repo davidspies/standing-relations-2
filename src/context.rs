@@ -1,13 +1,15 @@
-use std::hash::Hash;
+use std::{cell::Cell, hash::Hash, rc::Rc};
 
 use index_list::IndexList;
 use uuid::Uuid;
 
 use crate::{
     channel,
+    op::Op,
     operators::input::{Input, InputOp},
+    output::Output,
     relation::Relation,
-    Op, ValueCount,
+    value_count::ValueCount,
 };
 
 use self::pipes::{
@@ -24,6 +26,7 @@ pub struct CommitId(usize);
 
 pub struct CreationContext<'a> {
     id: ContextId,
+    commit_id: Rc<Cell<CommitId>>,
     input_pipes: Vec<Box<dyn PipeT + 'a>>,
     feedback_pipes: IndexList<Box<dyn PipeT + 'a>>,
 }
@@ -32,6 +35,7 @@ impl<'a> CreationContext<'a> {
     pub fn new() -> Self {
         Self {
             id: ContextId(Uuid::new_v4()),
+            commit_id: Rc::new(Cell::new(CommitId(0))),
             input_pipes: Vec::new(),
             feedback_pipes: IndexList::new(),
         }
@@ -64,9 +68,12 @@ impl<'a> CreationContext<'a> {
         self.feedback_pipes
             .insert_last(Box::new(FeedbackPipe::new(relation, input)));
     }
+    pub fn output<T, C>(&mut self, relation: Relation<T, C>) -> Output<T, C> {
+        Output::new(relation, self.commit_id.clone())
+    }
     pub fn begin(self) -> ExecutionContext<'a> {
         ExecutionContext {
-            current_commit_id: 0,
+            commit_id: self.commit_id,
             input_pipes: self.input_pipes,
             feedback_pipes: self.feedback_pipes,
         }
@@ -74,7 +81,7 @@ impl<'a> CreationContext<'a> {
 }
 
 pub struct ExecutionContext<'a> {
-    current_commit_id: usize,
+    commit_id: Rc<Cell<CommitId>>,
     input_pipes: Vec<Box<dyn PipeT + 'a>>,
     feedback_pipes: IndexList<Box<dyn PipeT + 'a>>,
 }
@@ -83,7 +90,7 @@ impl ExecutionContext<'_> {
     pub fn commit(&mut self) {
         self.one_pass();
         'outer: loop {
-            let commit_id = self.commit_id();
+            let commit_id = self.commit_id.get();
             let mut i = self.feedback_pipes.first_index();
             while i.is_some() {
                 let next_i = self.feedback_pipes.next_index(i);
@@ -135,14 +142,10 @@ impl ExecutionContext<'_> {
     }
 
     fn one_pass(&mut self) {
-        self.current_commit_id += 1;
-        let commit_id = self.commit_id();
+        self.commit_id.set(CommitId(self.commit_id.get().0 + 1));
+        let commit_id = self.commit_id.get();
         self.input_pipes
             .retain_mut(|pipe| pipe.process(commit_id).is_ok());
-    }
-
-    fn commit_id(&self) -> CommitId {
-        CommitId(self.current_commit_id)
     }
 }
 

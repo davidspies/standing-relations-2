@@ -1,7 +1,7 @@
 use crate::{
     channel,
     context::{CommitId, Dropped},
-    ValueCount,
+    value_count::ValueCount,
 };
 
 use super::PipeT;

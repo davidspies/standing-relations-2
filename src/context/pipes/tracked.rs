@@ -3,7 +3,8 @@ use std::hash::Hash;
 use crate::{
     channel,
     context::{CommitId, Dropped},
-    E1Map, ValueCount,
+    e1map::E1Map,
+    value_count::ValueCount,
 };
 
 use super::PipeT;

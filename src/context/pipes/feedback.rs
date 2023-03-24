@@ -2,7 +2,9 @@ use std::{collections::HashSet, hash::Hash};
 
 use crate::{
     context::{CommitId, Dropped},
-    Input, Op, Relation,
+    op::Op,
+    operators::input::Input,
+    relation::Relation,
 };
 
 use super::PipeT;
