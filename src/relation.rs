@@ -112,6 +112,20 @@ impl<T: Eq + Hash + Clone, C: Op<T>> Relation<T, C> {
                 count
             })
     }
+
+    pub fn global_max(self) -> Relation<T, impl Op<T>>
+    where
+        T: Ord,
+    {
+        self.map(|t| ((), t)).maxes().map(|((), t)| t)
+    }
+
+    pub fn global_min(self) -> Relation<T, impl Op<T>>
+    where
+        T: Ord,
+    {
+        self.map(|t| ((), t)).mins().map(|((), t)| t)
+    }
 }
 
 impl<K, V, C> Relation<(K, V), C> {
@@ -132,14 +146,34 @@ impl<K, V, C> Relation<(K, V), C> {
     ) -> Relation<(K, V), AntiJoin<K, V, C, CR>> {
         Relation::new(self.context_id, AntiJoin::new(self, other))
     }
+}
 
-    pub fn semijoin(self, other: Relation<K, impl Op<K>>) -> Relation<(K, V), impl Op<(K, V)>>
-    where
-        K: Eq + Hash + Clone,
-        V: Eq + Hash + Clone,
-        C: Op<(K, V)>,
-    {
+impl<K, V, C> Relation<(K, V), C>
+where
+    K: Eq + Hash + Clone,
+    V: Eq + Hash + Clone,
+    C: Op<(K, V)>,
+{
+    pub fn semijoin(self, other: Relation<K, impl Op<K>>) -> Relation<(K, V), impl Op<(K, V)>> {
         self.join(other.map(|t| (t, ()))).map(|(k, v, ())| (k, v))
+    }
+
+    pub fn maxes(self) -> Relation<(K, V), impl Op<(K, V)>>
+    where
+        V: Ord,
+    {
+        self.reduce(|_: &K, vals: &E1Map<V, ValueCount>| {
+            vals.iter().map(|(v, _)| v.clone()).max().unwrap()
+        })
+    }
+
+    pub fn mins(self) -> Relation<(K, V), impl Op<(K, V)>>
+    where
+        V: Ord,
+    {
+        self.reduce(|_: &K, vals: &E1Map<V, ValueCount>| {
+            vals.iter().map(|(v, _)| v.clone()).min().unwrap()
+        })
     }
 }
 
@@ -168,5 +202,11 @@ impl<L, R, C> Relation<(L, R), C> {
         C: Op<(L, R)>,
     {
         self.map(|(_l, r)| r)
+    }
+    pub fn swaps(self) -> Relation<(R, L), impl Op<(R, L)>>
+    where
+        C: Op<(L, R)>,
+    {
+        self.map(|(l, r)| (r, l))
     }
 }

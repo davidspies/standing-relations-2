@@ -1,6 +1,6 @@
 use std::{fmt::Debug, hash::Hash};
 
-use standing_relations_2::{CreationContext, E1Map, ValueCount};
+use standing_relations_2::CreationContext;
 
 fn dijkstra<Node: Debug + Eq + Hash + Clone>(
     start: Node,
@@ -10,25 +10,15 @@ fn dijkstra<Node: Debug + Eq + Hash + Clone>(
     let mut context = CreationContext::new();
 
     let (mut start_input, start_rel) = context.input::<Node>();
-
+    let (mut end_input, end_rel) = context.input::<Node>();
     let (mut edges_input, edges_rel) = context.input::<(Node, Node, usize)>();
 
-    let (mut end_input, end_rel) = context.input::<Node>();
+    let (path_input, path_len) = context.input::<(Node, usize)>();
+    let path_len = path_len.concat(start_rel.map(|n| (n, 0)));
+    let min_path = path_len.mins().dynamic().save();
 
-    let (min_path_input, min_path) = context.input::<(Node, usize)>();
-
-    let min_path = min_path.concat(start_rel.map(|n| (n, 0)));
-
-    let min_path = min_path
-        .reduce(|_: &Node, vals: &E1Map<usize, ValueCount>| {
-            vals.iter().map(|(&d, _)| d).min().unwrap()
-        })
-        .dynamic()
-        .save();
-
-    let path_to_end = min_path.get().semijoin(end_rel).snds().save();
+    let path_to_end = min_path.get().semijoin(end_rel).snds().dynamic().save();
     let end_path_output = context.output(path_to_end.get());
-
     context.interrupt(0, path_to_end.get());
 
     let next_path = min_path
@@ -40,21 +30,14 @@ fn dijkstra<Node: Debug + Eq + Hash + Clone>(
 
     let larger_next_paths = next_path.antijoin(path_distances).dynamic().save();
 
-    let next_path_distance = larger_next_paths
-        .get()
-        .fsts()
-        .map(|d| ((), d))
-        .reduce(|(): &(), ds: &E1Map<usize, ValueCount>| ds.iter().map(|(&d, _)| d).min().unwrap())
-        .snds()
-        .dynamic()
-        .save();
+    let next_path_distance = larger_next_paths.get().fsts().global_min().dynamic().save();
 
     let actual_next_paths = larger_next_paths
         .get()
         .semijoin(next_path_distance.get())
-        .map(|(dist, to)| (to, dist));
+        .swaps();
 
-    context.feedback(actual_next_paths, min_path_input);
+    context.feedback(actual_next_paths, path_input);
 
     context.feedback(next_path_distance.get(), path_distance_input);
 
