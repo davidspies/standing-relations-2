@@ -5,6 +5,10 @@ use std::{
     vec,
 };
 
+use derivative::Derivative;
+
+#[derive(Derivative)]
+#[derivative(Clone(bound = ""))]
 pub struct Sender<T>(Weak<RefCell<VecDeque<T>>>);
 
 pub struct Receiver<T> {

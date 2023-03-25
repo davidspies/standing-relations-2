@@ -4,7 +4,7 @@ pub trait Op<T> {
     fn foreach(&mut self, current_id: CommitId, f: impl FnMut(T, ValueCount));
 }
 
-impl<T, C: Op<T>> Op<T> for Box<C> {
+impl<T, C: Op<T> + ?Sized> Op<T> for Box<C> {
     fn foreach(&mut self, current_id: CommitId, f: impl FnMut(T, ValueCount)) {
         self.as_mut().foreach(current_id, f)
     }
