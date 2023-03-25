@@ -84,10 +84,16 @@ impl<'a> CreationContext<'a> {
         Output::new(relation, self.commit_id.clone())
     }
     pub fn begin(self) -> ExecutionContext<'a> {
+        let Self {
+            id: _,
+            commit_id,
+            input_pipes,
+            feedback_pipes,
+        } = self;
         ExecutionContext {
-            commit_id: self.commit_id,
-            input_pipes: self.input_pipes,
-            feedback_pipes: self.feedback_pipes,
+            commit_id,
+            input_pipes,
+            feedback_pipes,
         }
     }
 }
