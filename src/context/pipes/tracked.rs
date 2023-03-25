@@ -7,7 +7,7 @@ use crate::{
     value_count::ValueCount,
 };
 
-use super::PipeT;
+use super::{PipeT, ProcessResult};
 
 pub(crate) struct TrackedInputPipe<T> {
     receiver: channel::Receiver<(T, isize)>,
@@ -28,10 +28,10 @@ impl<T> TrackedInputPipe<T> {
 }
 
 impl<T: Eq + Hash + Clone> PipeT for TrackedInputPipe<T> {
-    fn process(&mut self, _commit_id: CommitId) -> Result<bool, Dropped> {
-        let mut any_changed = false;
+    fn process(&mut self, _commit_id: CommitId) -> Result<ProcessResult, Dropped> {
+        let mut result = ProcessResult::Unchanged;
         while let Some((value, count)) = self.receiver.try_recv() {
-            any_changed = true;
+            result = ProcessResult::Changed;
             if let Some(frame) = self.frame_changes.last_mut() {
                 frame.add(value.clone(), count);
             }
@@ -39,7 +39,7 @@ impl<T: Eq + Hash + Clone> PipeT for TrackedInputPipe<T> {
                 return Err(Dropped);
             }
         }
-        Ok(any_changed)
+        Ok(result)
     }
     fn push_frame(&mut self) {
         self.frame_changes.push(E1Map::new());

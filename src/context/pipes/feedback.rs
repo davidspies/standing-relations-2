@@ -7,7 +7,7 @@ use crate::{
     relation::Relation,
 };
 
-use super::PipeT;
+use super::{PipeT, ProcessResult};
 
 pub(crate) struct FeedbackPipe<T, C> {
     relation: Relation<T, C>,
@@ -28,12 +28,12 @@ impl<T, C> FeedbackPipe<T, C> {
 }
 
 impl<T: Eq + Hash + Clone, C: Op<T>> PipeT for FeedbackPipe<T, C> {
-    fn process(&mut self, commit_id: CommitId) -> Result<bool, Dropped> {
+    fn process(&mut self, commit_id: CommitId) -> Result<ProcessResult, Dropped> {
         let mut any_dropped = false;
-        let mut any_added = false;
+        let mut result = ProcessResult::Unchanged;
         self.relation.foreach(commit_id, |elem, _| {
             if self.seen.insert(elem.clone()) {
-                any_added = true;
+                result = ProcessResult::Changed;
                 if let Some(frame) = self.frame_changes.last_mut() {
                     frame.insert(elem.clone());
                 }
@@ -45,7 +45,7 @@ impl<T: Eq + Hash + Clone, C: Op<T>> PipeT for FeedbackPipe<T, C> {
         if any_dropped {
             Err(Dropped)
         } else {
-            Ok(any_added)
+            Ok(result)
         }
     }
     fn push_frame(&mut self) {

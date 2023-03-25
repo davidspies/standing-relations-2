@@ -13,7 +13,11 @@ use crate::{
 };
 
 use self::pipes::{
-    feedback::FeedbackPipe, tracked::TrackedInputPipe, untracked::UntrackedInputPipe, PipeT,
+    feedback::FeedbackPipe,
+    interrupt::{Interrupt, InterruptId},
+    tracked::TrackedInputPipe,
+    untracked::UntrackedInputPipe,
+    PipeT, ProcessResult,
 };
 
 mod pipes;
@@ -68,6 +72,14 @@ impl<'a> CreationContext<'a> {
         self.feedback_pipes
             .insert_last(Box::new(FeedbackPipe::new(relation, input)));
     }
+    pub fn interrupt<T: Eq + Hash + 'a, C: Op<T> + 'a>(
+        &mut self,
+        id: InterruptId,
+        relation: Relation<T, C>,
+    ) {
+        self.feedback_pipes
+            .insert_last(Box::new(Interrupt::new(id, relation)));
+    }
     pub fn output<T, C>(&mut self, relation: Relation<T, C>) -> Output<T, C> {
         Output::new(relation, self.commit_id.clone())
     }
@@ -87,7 +99,7 @@ pub struct ExecutionContext<'a> {
 }
 
 impl ExecutionContext<'_> {
-    pub fn commit(&mut self) {
+    pub fn commit(&mut self) -> Result<(), InterruptId> {
         self.one_pass();
         'outer: loop {
             let commit_id = self.commit_id.get();
@@ -95,18 +107,21 @@ impl ExecutionContext<'_> {
             while i.is_some() {
                 let next_i = self.feedback_pipes.next_index(i);
                 match self.feedback_pipes.get_mut(i).unwrap().process(commit_id) {
-                    Ok(true) => {
+                    Ok(ProcessResult::Changed) => {
                         self.one_pass();
                         continue 'outer;
                     }
-                    Ok(false) => {}
+                    Ok(ProcessResult::Unchanged) => {}
+                    Ok(ProcessResult::Interrupted(interrupt_id)) => {
+                        return Err(interrupt_id);
+                    }
                     Err(Dropped) => {
                         self.feedback_pipes.remove(i);
                     }
                 }
                 i = next_i;
             }
-            return;
+            return Ok(());
         }
     }
 

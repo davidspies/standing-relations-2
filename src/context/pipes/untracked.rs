@@ -4,7 +4,7 @@ use crate::{
     value_count::ValueCount,
 };
 
-use super::PipeT;
+use super::{PipeT, ProcessResult};
 
 pub(crate) struct UntrackedInputPipe<T> {
     receiver: channel::Receiver<(T, isize)>,
@@ -20,15 +20,15 @@ impl<T> UntrackedInputPipe<T> {
 }
 
 impl<T> PipeT for UntrackedInputPipe<T> {
-    fn process(&mut self, _commit_id: CommitId) -> Result<bool, Dropped> {
-        let mut any_changed = false;
+    fn process(&mut self, _commit_id: CommitId) -> Result<ProcessResult, Dropped> {
+        let mut result = ProcessResult::Unchanged;
         while let Some((value, count)) = self.receiver.try_recv() {
-            any_changed = true;
+            result = ProcessResult::Changed;
             if self.sender.send((value, count)).is_err() {
                 return Err(Dropped);
             }
         }
-        Ok(any_changed)
+        Ok(result)
     }
     fn push_frame(&mut self) {}
     fn pop_frame(&mut self) -> Result<(), Dropped> {
