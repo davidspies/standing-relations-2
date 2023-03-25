@@ -1,5 +1,5 @@
 use std::{
-    collections::{hash_map, HashMap},
+    collections::{hash_map, HashMap, HashSet},
     hash::Hash,
     mem,
 };
@@ -10,8 +10,8 @@ pub struct Reduce<K, V, Y, F, C> {
     sub_rel: Relation<(K, V), C>,
     f: F,
     aggregated_values: E1Map<K, E1Map<V, ValueCount>>,
-    outputs: HashMap<K, (CommitId, Y)>,
-    changed_keys_scratch: HashMap<K, CommitId>,
+    outputs: HashMap<K, Y>,
+    changed_keys_scratch: HashSet<K>,
 }
 
 impl<K, V, Y, F, C> Reduce<K, V, Y, F, C> {
@@ -21,7 +21,7 @@ impl<K, V, Y, F, C> Reduce<K, V, Y, F, C> {
             f,
             aggregated_values: E1Map::default(),
             outputs: HashMap::default(),
-            changed_keys_scratch: HashMap::default(),
+            changed_keys_scratch: HashSet::default(),
         }
     }
 }
@@ -37,29 +37,28 @@ where
     fn foreach(&mut self, current_id: CommitId, mut f: impl FnMut((K, Y), ValueCount)) {
         self.sub_rel.foreach(current_id, |(k, v), count| {
             self.aggregated_values.add(k.clone(), (v, count));
-            let commit_id = self.changed_keys_scratch.entry(k).or_default();
-            *commit_id = (*commit_id).max(count.commit_id);
+            self.changed_keys_scratch.insert(k);
         });
-        for (k, context) in self.changed_keys_scratch.drain() {
+        for k in self.changed_keys_scratch.drain() {
             match self.aggregated_values.get(&k) {
                 None => {
-                    if let Some((context, y)) = self.outputs.remove(&k) {
-                        f((k, y), ValueCount::decr(context))
+                    if let Some(y) = self.outputs.remove(&k) {
+                        f((k, y), -1)
                     }
                 }
                 Some(vals) => {
                     let new_y = (self.f)(&k, vals);
                     match self.outputs.entry(k.clone()) {
                         hash_map::Entry::Vacant(vac) => {
-                            vac.insert((context, new_y.clone()));
-                            f((k, new_y), ValueCount::incr(context));
+                            vac.insert(new_y.clone());
+                            f((k, new_y), 1);
                         }
                         hash_map::Entry::Occupied(mut occ) => {
                             let out = occ.get_mut();
-                            if new_y != out.1 {
-                                let (_, old_y) = mem::replace(out, (context, new_y.clone()));
-                                f((k.clone(), old_y), ValueCount::decr(context));
-                                f((k, new_y), ValueCount::incr(context));
+                            if new_y != *out {
+                                let old_y = mem::replace(out, new_y.clone());
+                                f((k.clone(), old_y), -1);
+                                f((k, new_y), 1);
                             }
                         }
                     }

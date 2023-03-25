@@ -28,19 +28,11 @@ impl<T: Clone + Eq + Hash, C: Op<T>> Op<T> for Distinct<T, C> {
                 ValueChanges {
                     was_zero: true,
                     is_zero: false,
-                } => self
-                    .changed_scratch
-                    .entry(value)
-                    .or_default()
-                    .add(count.commit_id),
+                } => self.changed_scratch.entry(value).or_default().add(),
                 ValueChanges {
                     was_zero: false,
                     is_zero: true,
-                } => self
-                    .changed_scratch
-                    .entry(value)
-                    .or_default()
-                    .remove(count.commit_id),
+                } => self.changed_scratch.entry(value).or_default().remove(),
                 ValueChanges {
                     was_zero: true,
                     is_zero: true,
@@ -59,40 +51,15 @@ impl<T: Clone + Eq + Hash, C: Op<T>> Op<T> for Distinct<T, C> {
     }
 }
 
-#[derive(Default)]
-struct DistinctChange {
-    commit_id: CommitId,
-    value: DistinctChangeValue,
-}
-
-impl DistinctChange {
-    fn add(&mut self, context: CommitId) {
-        self.commit_id = self.commit_id.max(context);
-        self.value.add()
-    }
-    fn remove(&mut self, commit_id: CommitId) {
-        self.commit_id = self.commit_id.max(commit_id);
-        self.value.remove()
-    }
-
-    fn count(&self) -> Option<ValueCount> {
-        match self.value {
-            DistinctChangeValue::Removed => Some(ValueCount::decr(self.commit_id)),
-            DistinctChangeValue::NoChange => None,
-            DistinctChangeValue::Added => Some(ValueCount::incr(self.commit_id)),
-        }
-    }
-}
-
 #[derive(Clone, Copy, Default)]
-enum DistinctChangeValue {
+enum DistinctChange {
     Removed,
     #[default]
     NoChange,
     Added,
 }
 
-impl DistinctChangeValue {
+impl DistinctChange {
     fn add(&mut self) {
         match self {
             Self::NoChange => *self = Self::Added,
@@ -105,6 +72,13 @@ impl DistinctChangeValue {
             Self::NoChange => *self = Self::Removed,
             Self::Added => *self = Self::NoChange,
             Self::Removed => panic!("Already removed"),
+        }
+    }
+    fn count(&self) -> Option<isize> {
+        match self {
+            Self::NoChange => None,
+            Self::Added => Some(1),
+            Self::Removed => Some(-1),
         }
     }
 }

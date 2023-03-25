@@ -20,12 +20,11 @@ impl<T> UntrackedInputPipe<T> {
 }
 
 impl<T> PipeT for UntrackedInputPipe<T> {
-    fn process(&mut self, commit_id: CommitId) -> Result<bool, Dropped> {
+    fn process(&mut self, _commit_id: CommitId) -> Result<bool, Dropped> {
         let mut any_changed = false;
         while let Some((value, count)) = self.receiver.try_recv() {
             any_changed = true;
-            let value_count = ValueCount { commit_id, count };
-            if self.sender.send((value, value_count)).is_err() {
+            if self.sender.send((value, count)).is_err() {
                 return Err(Dropped);
             }
         }
