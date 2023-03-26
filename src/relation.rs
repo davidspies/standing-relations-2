@@ -170,7 +170,7 @@ where
         V: Ord,
     {
         self.reduce(|_: &K, vals: &E1Map<V, ValueCount>| {
-            vals.iter().map(|(v, _)| v.clone()).max().unwrap()
+            vals.iter().map(|(v, _)| v).max().unwrap().clone()
         })
     }
 
@@ -179,7 +179,7 @@ where
         V: Ord,
     {
         self.reduce(|_: &K, vals: &E1Map<V, ValueCount>| {
-            vals.iter().map(|(v, _)| v.clone()).min().unwrap()
+            vals.iter().map(|(v, _)| v).min().unwrap().clone()
         })
     }
 }
