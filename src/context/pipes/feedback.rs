@@ -4,20 +4,20 @@ use crate::{
     context::{CommitId, Dropped},
     op::Op,
     operators::input::Input,
-    relation::Relation,
+    relation::RelationInner,
 };
 
 use super::{PipeT, ProcessResult};
 
 pub(crate) struct FeedbackPipe<T, C> {
-    relation: Relation<T, C>,
+    relation: RelationInner<T, C>,
     seen: HashSet<T>,
     frame_changes: Vec<HashSet<T>>,
     input: Input<T>,
 }
 
 impl<T, C> FeedbackPipe<T, C> {
-    pub(crate) fn new(relation: Relation<T, C>, input: Input<T>) -> Self {
+    pub(crate) fn new(relation: RelationInner<T, C>, input: Input<T>) -> Self {
         FeedbackPipe {
             relation,
             seen: HashSet::new(),

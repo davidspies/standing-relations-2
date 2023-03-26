@@ -4,10 +4,12 @@ use std::{
     rc::Rc,
 };
 
-use crate::{context::CommitId, e1map::E1Map, op::Op, relation::Relation, value_count::ValueCount};
+use crate::{
+    context::CommitId, e1map::E1Map, op::Op, relation::RelationInner, value_count::ValueCount,
+};
 
 struct OutputInner<T, C> {
-    relation: Relation<T, C>,
+    relation: RelationInner<T, C>,
     values: E1Map<T, ValueCount>,
 }
 
@@ -25,7 +27,7 @@ pub struct Output<T, C> {
 }
 
 impl<T, C> Output<T, C> {
-    pub(crate) fn new(relation: Relation<T, C>, commit_id: Rc<Cell<CommitId>>) -> Self {
+    pub(crate) fn new(relation: RelationInner<T, C>, commit_id: Rc<Cell<CommitId>>) -> Self {
         Output {
             inner: RefCell::new(OutputInner {
                 relation,

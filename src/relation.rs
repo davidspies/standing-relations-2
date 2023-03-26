@@ -103,10 +103,6 @@ impl<T, C: Op<T>> Relation<T, C> {
         Self::new(context_ids.into_singleton().unwrap().0, data, op)
     }
 
-    pub(crate) fn foreach(&mut self, current_id: CommitId, f: impl FnMut(T, ValueCount)) {
-        self.inner.foreach(current_id, f)
-    }
-
     pub fn dynamic<'a>(self) -> Relation<T, Box<dyn DynOp<T> + 'a>>
     where
         C: 'a,

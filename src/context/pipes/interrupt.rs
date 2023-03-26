@@ -4,7 +4,7 @@ use crate::{
     context::{CommitId, Dropped},
     e1map::E1Map,
     op::Op,
-    relation::Relation,
+    relation::RelationInner,
     value_count::ValueCount,
 };
 
@@ -13,13 +13,13 @@ use super::{PipeT, ProcessResult};
 pub type InterruptId = usize;
 
 pub struct Interrupt<T, C> {
-    relation: Relation<T, C>,
+    relation: RelationInner<T, C>,
     interrupt_id: InterruptId,
     values: E1Map<T, ValueCount>,
 }
 
 impl<T, C> Interrupt<T, C> {
-    pub(crate) fn new(interrupt_id: InterruptId, relation: Relation<T, C>) -> Self {
+    pub(crate) fn new(interrupt_id: InterruptId, relation: RelationInner<T, C>) -> Self {
         Self {
             relation,
             interrupt_id,

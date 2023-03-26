@@ -73,7 +73,7 @@ impl<'a> CreationContext<'a> {
         input: Input<T>,
     ) {
         self.feedback_pipes
-            .insert_last(Box::new(FeedbackPipe::new(relation, input)));
+            .insert_last(Box::new(FeedbackPipe::new(relation.inner, input)));
     }
     pub fn interrupt<T: Eq + Hash + 'a, C: Op<T> + 'a>(
         &mut self,
@@ -81,7 +81,7 @@ impl<'a> CreationContext<'a> {
         relation: Relation<T, C>,
     ) {
         self.feedback_pipes
-            .insert_last(Box::new(Interrupt::new(id, relation)));
+            .insert_last(Box::new(Interrupt::new(id, relation.inner)));
     }
     pub fn first_occurrences<K: Eq + Hash + Clone + 'a, V: Eq + Hash + Clone + 'a>(
         &mut self,
@@ -93,7 +93,7 @@ impl<'a> CreationContext<'a> {
         input_rel
     }
     pub fn output<T, C>(&mut self, relation: Relation<T, C>) -> Output<T, C> {
-        Output::new(relation, self.commit_id.clone())
+        Output::new(relation.inner, self.commit_id.clone())
     }
     pub fn begin(self) -> ExecutionContext<'a> {
         let Self {
