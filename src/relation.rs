@@ -21,7 +21,7 @@ use crate::{
     value_count::ValueCount,
 };
 
-pub struct Relation<T, C> {
+pub struct Relation<T, C = Box<dyn DynOp<T>>> {
     phantom: PhantomData<T>,
     context_id: ContextId,
     operator: C,
@@ -91,6 +91,13 @@ impl<T, C> Relation<T, C> {
         C: Op<T>,
     {
         self.flat_map(move |x| iter::once(f(x)))
+    }
+
+    pub fn collect<'a>(self) -> Saved<T, Box<dyn DynOp<T> + 'a>>
+    where
+        C: Op<T> + 'a,
+    {
+        self.dynamic().save()
     }
 }
 

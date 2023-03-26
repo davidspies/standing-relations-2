@@ -2,8 +2,10 @@ use std::hash::Hash;
 
 use crate::{
     context::{CommitId, Dropped},
+    e1map::E1Map,
+    op::Op,
     relation::Relation,
-    E1Map, Op, ValueCount,
+    value_count::ValueCount,
 };
 
 use super::{PipeT, ProcessResult};

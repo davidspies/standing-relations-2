@@ -3,7 +3,7 @@ use std::{cell::RefCell, rc::Rc};
 use crate::{
     broadcast_channel::{Receiver, Sender},
     context::CommitId,
-    op::Op,
+    op::{DynOp, Op},
     relation::Relation,
     value_count::ValueCount,
 };
@@ -14,7 +14,7 @@ struct SavedInner<T, C> {
     sender: Sender<(T, ValueCount)>,
 }
 
-pub struct Saved<T, C>(Rc<RefCell<SavedInner<T, C>>>);
+pub struct Saved<T, C = Box<dyn DynOp<T>>>(Rc<RefCell<SavedInner<T, C>>>);
 
 impl<T, C> Saved<T, C> {
     pub(crate) fn new(sub_rel: Relation<T, C>) -> Self {
