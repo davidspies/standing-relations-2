@@ -28,54 +28,76 @@ mod args;
 pub(crate) mod data;
 
 pub struct Relation<T, C = Box<dyn DynOp<T>>> {
+    pub(crate) data: RelationData,
+    pub(crate) context_id: ContextId,
+    pub(crate) inner: RelationInner<T, C>,
+}
+
+pub(crate) struct RelationInner<T, C> {
     phantom: PhantomData<T>,
-    context_id: ContextId,
-    data: Arc<RelationData>,
     operator: C,
 }
 
+impl<T, C> RelationInner<T, C> {
+    pub(crate) fn foreach(&mut self, current_id: CommitId, f: impl FnMut(T, ValueCount))
+    where
+        C: Op<T>,
+    {
+        self.operator.foreach(current_id, f)
+    }
+}
+
 impl<T, C> Relation<T, C> {
-    pub(crate) fn new(context_id: ContextId, data: Arc<RelationData>, operator: C) -> Self {
+    pub(crate) fn new(context_id: ContextId, data: RelationData, operator: C) -> Self {
         Self {
-            phantom: PhantomData,
             context_id,
             data,
-            operator,
+            inner: RelationInner {
+                phantom: PhantomData,
+                operator,
+            },
         }
     }
 
-    pub(crate) fn context_id(&self) -> ContextId {
-        self.context_id
+    pub fn named(mut self, name: String) -> Self {
+        self.data.set_name(name);
+        self
     }
 
-    pub(crate) fn data(&self) -> Arc<RelationData> {
-        self.data.clone()
+    pub fn type_named(mut self, type_name: &'static str) -> Self {
+        self.data.set_type_name(type_name);
+        self
+    }
+
+    pub fn hidden(mut self) -> Self {
+        self.data.hide();
+        self
     }
 }
 
 impl<T, C: Op<T>> Relation<T, C> {
     pub(crate) fn from_op<Subrels: RelationArgs>(
         subrels: Subrels,
-        operator: impl FnOnce(Subrels) -> C,
+        operator: impl FnOnce(Subrels::Inner) -> C,
     ) -> Self {
         let mut context_ids = E1Map::new();
         subrels.add_context_ids(&mut context_ids);
         let mut children = Vec::new();
-        subrels.push_datas(&mut children);
-        let op = operator(subrels);
-        let data = Arc::new(RelationData::new(op.type_name(), children));
+        let inner = subrels.push_datas(&mut children);
+        let op = operator(inner);
+        let data = RelationData::new(op.type_name(), children);
         Self::new(context_ids.into_singleton().unwrap().0, data, op)
     }
 
     pub(crate) fn foreach(&mut self, current_id: CommitId, f: impl FnMut(T, ValueCount)) {
-        self.operator.foreach(current_id, f)
+        self.inner.foreach(current_id, f)
     }
 
     pub fn dynamic<'a>(self) -> Relation<T, Box<dyn DynOp<T> + 'a>>
     where
         C: 'a,
     {
-        Relation::new(self.context_id, self.data, Box::new(self.operator))
+        Relation::new(self.context_id, self.data, Box::new(self.inner.operator))
     }
 
     pub fn flat_map<U, F: Fn(T) -> I, I>(self, f: F) -> Relation<U, FlatMap<T, F, C>>
@@ -118,21 +140,28 @@ impl<T, C: Op<T>> Relation<T, C> {
     where
         CR: Op<T>,
     {
-        self.concat(other.negate())
+        self.concat(other.negate().hidden()).type_named("minus")
     }
 
-    pub fn flatten<U>(self) -> Relation<U, FlatMap<T, fn(T) -> T, C>>
+    pub fn flatten<U>(self) -> Relation<U, impl Op<U>>
     where
         T: IntoIterator<Item = U>,
     {
-        self.flat_map(identity)
+        self.flat_map(identity).type_named("flatten")
     }
 
     pub fn map<U>(self, f: impl Fn(T) -> U) -> Relation<U, impl Op<U>>
     where
         C: Op<T>,
     {
-        self.flat_map(move |x| iter::once(f(x)))
+        self.flat_map(move |x| iter::once(f(x))).type_named("map")
+    }
+
+    pub fn map_h<U>(self, f: impl Fn(T) -> U) -> Relation<U, impl Op<U>>
+    where
+        C: Op<T>,
+    {
+        self.map(f).hidden()
     }
 
     pub fn collect<'a>(self) -> Saved<T, Box<dyn DynOp<T> + 'a>>
@@ -145,35 +174,46 @@ impl<T, C: Op<T>> Relation<T, C> {
 
 impl<T: Eq + Hash + Clone, C: Op<T>> Relation<T, C> {
     pub fn intersection(self, other: Relation<T, impl Op<T>>) -> Relation<T, impl Op<T>> {
-        self.map(|t| (t, ()))
-            .join(other.map(|t| (t, ())))
-            .map(|(t, (), ())| t)
+        self.map_h(|t| (t, ()))
+            .join(other.map_h(|t| (t, ())))
+            .map_h(|(t, (), ())| t)
+            .type_named("intersection")
     }
 
     pub fn set_minus(self, other: Relation<T, impl Op<T>>) -> Relation<T, impl Op<T>> {
-        self.map(|t| (t, ())).antijoin(other).fsts()
+        self.map_h(|t| (t, ()))
+            .antijoin(other)
+            .fsts()
+            .type_named("set_minus")
     }
 
     pub fn counts(self) -> Relation<(T, isize), impl Op<(T, isize)>> {
-        self.map(|t| (t, ()))
-            .reduce(|_: &T, vals: &E1Map<(), ValueCount>| {
+        self.map_h(|t| (t, ()))
+            .reduce(|_, vals| {
                 let ((), &count) = vals.get_singleton().unwrap();
                 count
             })
+            .type_named("counts")
     }
 
     pub fn global_max(self) -> Relation<T, impl Op<T>>
     where
         T: Ord,
     {
-        self.map(|t| ((), t)).maxes().map(|((), t)| t)
+        self.map_h(|t| ((), t))
+            .maxes()
+            .map_h(|((), t)| t)
+            .type_named("global_max")
     }
 
     pub fn global_min(self) -> Relation<T, impl Op<T>>
     where
         T: Ord,
     {
-        self.map(|t| ((), t)).mins().map(|((), t)| t)
+        self.map_h(|t| ((), t))
+            .mins()
+            .map_h(|((), t)| t)
+            .type_named("global_min")
     }
 }
 
@@ -212,25 +252,25 @@ where
     }
 
     pub fn semijoin(self, other: Relation<K, impl Op<K>>) -> Relation<(K, V), impl Op<(K, V)>> {
-        self.join(other.map(|t| (t, ()))).map(|(k, v, ())| (k, v))
+        self.join(other.map_h(|t| (t, ())))
+            .map_h(|(k, v, ())| (k, v))
+            .type_named("semijoin")
     }
 
     pub fn maxes(self) -> Relation<(K, V), impl Op<(K, V)>>
     where
         V: Ord,
     {
-        self.reduce(|_: &K, vals: &E1Map<V, ValueCount>| {
-            vals.iter().map(|(v, _)| v).max().unwrap().clone()
-        })
+        self.reduce(|_, vals| vals.iter().map(|(v, _)| v).max().unwrap().clone())
+            .type_named("maxes")
     }
 
     pub fn mins(self) -> Relation<(K, V), impl Op<(K, V)>>
     where
         V: Ord,
     {
-        self.reduce(|_: &K, vals: &E1Map<V, ValueCount>| {
-            vals.iter().map(|(v, _)| v).min().unwrap().clone()
-        })
+        self.reduce(|_, vals| vals.iter().map(|(v, _)| v).min().unwrap().clone())
+            .type_named("mins")
     }
 }
 
@@ -242,17 +282,17 @@ impl<L, R, C: Op<(L, R)>> Relation<(L, R), C> {
         Relation<R, SplitOp<R, L, R, C>>,
     ) {
         let context_id = self.context_id;
-        let children = vec![self.data()];
-        let Split { left, right } = Split::new(self);
+        let children = vec![Arc::new(self.data)];
+        let Split { left, right } = Split::new(self.inner);
         (
             Relation::new(
                 context_id,
-                Arc::new(RelationData::new(Op::type_name(&left), children.clone())),
+                RelationData::new(Op::type_name(&left), children.clone()),
                 left,
             ),
             Relation::new(
                 context_id,
-                Arc::new(RelationData::new(Op::type_name(&right), children)),
+                RelationData::new(Op::type_name(&right), children),
                 right,
             ),
         )
@@ -261,18 +301,18 @@ impl<L, R, C: Op<(L, R)>> Relation<(L, R), C> {
     where
         C: Op<(L, R)>,
     {
-        self.map(|(l, _r)| l)
+        self.map_h(|(l, _r)| l)
     }
     pub fn snds(self) -> Relation<R, impl Op<R>>
     where
         C: Op<(L, R)>,
     {
-        self.map(|(_l, r)| r)
+        self.map_h(|(_l, r)| r)
     }
     pub fn swaps(self) -> Relation<(R, L), impl Op<(R, L)>>
     where
         C: Op<(L, R)>,
     {
-        self.map(|(l, r)| (r, l))
+        self.map_h(|(l, r)| (r, l))
     }
 }

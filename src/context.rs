@@ -1,4 +1,4 @@
-use std::{cell::Cell, hash::Hash, rc::Rc, sync::Arc};
+use std::{cell::Cell, hash::Hash, rc::Rc};
 
 use index_list::IndexList;
 use uuid::Uuid;
@@ -57,7 +57,7 @@ impl<'a> CreationContext<'a> {
             Input::new(sender1),
             Relation::new(
                 self.id,
-                Arc::new(RelationData::new(operator.type_name(), vec![])),
+                RelationData::new(operator.type_name(), vec![]),
                 operator,
             ),
         )
@@ -72,7 +72,7 @@ impl<'a> CreationContext<'a> {
             Input::new(sender1),
             Relation::new(
                 self.id,
-                Arc::new(RelationData::new(operator.type_name(), vec![])),
+                RelationData::new(operator.type_name(), vec![]),
                 operator,
             ),
         )

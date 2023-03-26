@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
 pub(crate) struct RelationData {
-    name: Option<String>,
-    type_name: &'static str,
-    hidden: bool,
-    children: Vec<Arc<RelationData>>,
+    pub(super) name: Option<String>,
+    pub(super) type_name: &'static str,
+    pub(super) hidden: bool,
+    pub(super) children: Vec<Arc<RelationData>>,
 }
 impl RelationData {
     pub(crate) fn new(type_name: &'static str, children: Vec<Arc<RelationData>>) -> Self {
@@ -14,5 +14,27 @@ impl RelationData {
             hidden: false,
             children,
         }
+    }
+
+    fn on_first_shown(&mut self, f: impl FnOnce(&mut Self)) {
+        if self.hidden {
+            assert_eq!(self.children.len(), 1);
+            let child = Arc::get_mut(&mut self.children[0]).unwrap();
+            child.on_first_shown(f)
+        } else {
+            f(self)
+        }
+    }
+
+    pub(super) fn set_name(&mut self, name: String) {
+        self.on_first_shown(|data| data.name = Some(name))
+    }
+
+    pub(super) fn set_type_name(&mut self, type_name: &'static str) {
+        self.on_first_shown(|data| data.type_name = type_name)
+    }
+
+    pub(crate) fn hide(&mut self) {
+        self.on_first_shown(|data| data.hidden = true)
     }
 }

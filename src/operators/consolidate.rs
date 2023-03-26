@@ -1,14 +1,14 @@
 use std::hash::Hash;
 
-use crate::{context::CommitId, e1map::E1Map, op::Op, relation::Relation, value_count::ValueCount};
+use crate::{context::CommitId, e1map::E1Map, op::Op, relation::RelationInner, value_count::ValueCount};
 
 pub struct Consolidate<T, C> {
-    sub_rel: Relation<T, C>,
+    sub_rel: RelationInner<T, C>,
     collected_scratch: E1Map<T, ValueCount>,
 }
 
 impl<T, C> Consolidate<T, C> {
-    pub fn new(sub_rel: Relation<T, C>) -> Self {
+    pub(crate) fn new(sub_rel: RelationInner<T, C>) -> Self {
         Self {
             sub_rel,
             collected_scratch: E1Map::default(),

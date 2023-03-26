@@ -1,12 +1,12 @@
-use crate::{context::CommitId, op::Op, relation::Relation, value_count::ValueCount};
+use crate::{context::CommitId, op::Op, relation::RelationInner, value_count::ValueCount};
 
 pub struct Concat<T, CL, CR> {
-    left: Relation<T, CL>,
-    right: Relation<T, CR>,
+    left: RelationInner<T, CL>,
+    right: RelationInner<T, CR>,
 }
 
 impl<T, CL, CR> Concat<T, CL, CR> {
-    pub fn new((left, right): (Relation<T, CL>, Relation<T, CR>)) -> Self {
+    pub(crate) fn new((left, right): (RelationInner<T, CL>, RelationInner<T, CR>)) -> Self {
         Self { left, right }
     }
 }

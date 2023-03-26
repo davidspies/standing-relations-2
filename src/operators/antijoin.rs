@@ -1,19 +1,19 @@
 use std::hash::Hash;
 
 use crate::{
-    add_to_value::ValueChanges, context::CommitId, e1map::E1Map, op::Op, relation::Relation,
+    add_to_value::ValueChanges, context::CommitId, e1map::E1Map, op::Op, relation::RelationInner,
     value_count::ValueCount,
 };
 
 pub struct AntiJoin<K, V, CL, CR> {
-    left_rel: Relation<(K, V), CL>,
-    right_rel: Relation<K, CR>,
+    left_rel: RelationInner<(K, V), CL>,
+    right_rel: RelationInner<K, CR>,
     left_values: E1Map<K, E1Map<V, ValueCount>>,
     right_values: E1Map<K, ValueCount>,
 }
 
 impl<K, V, CL, CR> AntiJoin<K, V, CL, CR> {
-    pub fn new((left_rel, right_rel): (Relation<(K, V), CL>, Relation<K, CR>)) -> Self {
+    pub(crate) fn new((left_rel, right_rel): (RelationInner<(K, V), CL>, RelationInner<K, CR>)) -> Self {
         Self {
             left_rel,
             right_rel,

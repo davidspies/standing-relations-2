@@ -1,11 +1,11 @@
-use crate::{context::CommitId, op::Op, relation::Relation, value_count::ValueCount};
+use crate::{context::CommitId, op::Op, relation::RelationInner, value_count::ValueCount};
 
 pub struct Negate<T, C> {
-    sub_rel: Relation<T, C>,
+    sub_rel: RelationInner<T, C>,
 }
 
 impl<T, C> Negate<T, C> {
-    pub(crate) fn new(sub_rel: Relation<T, C>) -> Self {
+    pub(crate) fn new(sub_rel: RelationInner<T, C>) -> Self {
         Self { sub_rel }
     }
 }

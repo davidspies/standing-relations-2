@@ -4,13 +4,13 @@ use crate::{
     channel::{self, Receiver, Sender},
     context::CommitId,
     op::Op,
-    relation::Relation,
+    relation::RelationInner,
     value_count::ValueCount,
 };
 
 struct SplitInner<L, R, C> {
     last_id: CommitId,
-    sub_rel: Relation<(L, R), C>,
+    sub_rel: RelationInner<(L, R), C>,
     left_sender: Sender<(L, ValueCount)>,
     right_sender: Sender<(R, ValueCount)>,
 }
@@ -21,7 +21,7 @@ pub(crate) struct Split<L, R, C> {
 }
 
 impl<L, R, C> Split<L, R, C> {
-    pub(crate) fn new(sub_rel: Relation<(L, R), C>) -> Self {
+    pub(crate) fn new(sub_rel: RelationInner<(L, R), C>) -> Self {
         let (left_sender, left_receiver) = channel::new();
         let (right_sender, right_receiver) = channel::new();
         let inner = Rc::new(RefCell::new(SplitInner {

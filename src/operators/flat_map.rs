@@ -1,12 +1,12 @@
-use crate::{context::CommitId, op::Op, relation::Relation, value_count::ValueCount};
+use crate::{context::CommitId, op::Op, relation::RelationInner, value_count::ValueCount};
 
 pub struct FlatMap<S, F, C> {
-    sub_rel: Relation<S, C>,
+    sub_rel: RelationInner<S, C>,
     f: F,
 }
 
 impl<S, F, C> FlatMap<S, F, C> {
-    pub fn new(sub_rel: Relation<S, C>, f: F) -> Self {
+    pub(crate) fn new(sub_rel: RelationInner<S, C>, f: F) -> Self {
         Self { sub_rel, f }
     }
 }

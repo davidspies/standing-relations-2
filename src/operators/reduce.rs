@@ -4,10 +4,10 @@ use std::{
     mem,
 };
 
-use crate::{context::CommitId, e1map::E1Map, op::Op, relation::Relation, value_count::ValueCount};
+use crate::{context::CommitId, e1map::E1Map, op::Op, relation::RelationInner, value_count::ValueCount};
 
 pub struct Reduce<K, V, Y, F, C> {
-    sub_rel: Relation<(K, V), C>,
+    sub_rel: RelationInner<(K, V), C>,
     f: F,
     aggregated_values: E1Map<K, E1Map<V, ValueCount>>,
     outputs: HashMap<K, Y>,
@@ -15,7 +15,7 @@ pub struct Reduce<K, V, Y, F, C> {
 }
 
 impl<K, V, Y, F, C> Reduce<K, V, Y, F, C> {
-    pub(crate) fn new(sub_rel: Relation<(K, V), C>, f: F) -> Self {
+    pub(crate) fn new(sub_rel: RelationInner<(K, V), C>, f: F) -> Self {
         Self {
             sub_rel,
             f,

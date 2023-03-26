@@ -1,16 +1,20 @@
 use std::hash::Hash;
 
-use crate::{context::CommitId, e1map::E1Map, op::Op, relation::Relation, value_count::ValueCount};
+use crate::{
+    context::CommitId, e1map::E1Map, op::Op, relation::RelationInner, value_count::ValueCount,
+};
 
 pub struct InnerJoin<K, VL, CL, VR, CR> {
-    left_rel: Relation<(K, VL), CL>,
-    right_rel: Relation<(K, VR), CR>,
+    left_rel: RelationInner<(K, VL), CL>,
+    right_rel: RelationInner<(K, VR), CR>,
     left_values: E1Map<K, E1Map<VL, ValueCount>>,
     right_values: E1Map<K, E1Map<VR, ValueCount>>,
 }
 
 impl<K, VL, CL, VR, CR> InnerJoin<K, VL, CL, VR, CR> {
-    pub fn new((left_rel, right_rel): (Relation<(K, VL), CL>, Relation<(K, VR), CR>)) -> Self {
+    pub(crate) fn new(
+        (left_rel, right_rel): (RelationInner<(K, VL), CL>, RelationInner<(K, VR), CR>),
+    ) -> Self {
         Self {
             left_rel,
             right_rel,
