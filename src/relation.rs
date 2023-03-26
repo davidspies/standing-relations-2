@@ -125,7 +125,7 @@ impl<T: Eq + Hash + Clone, C: Op<T>> Relation<T, C> {
     pub fn counts(self) -> Relation<(T, isize), impl Op<(T, isize)>> {
         self.map(|t| (t, ()))
             .reduce(|_: &T, vals: &E1Map<(), ValueCount>| {
-                let ((), &count) = vals.iter().next().unwrap();
+                let ((), &count) = vals.get_singleton().unwrap();
                 count
             })
     }

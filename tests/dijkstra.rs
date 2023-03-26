@@ -51,7 +51,7 @@ fn dijkstra<Node: Debug + Eq + Hash + Clone>(
 
     match context.commit() {
         Ok(()) => None,
-        Err(0) => Some(*end_path_output.get().iter().next().unwrap().0),
+        Err(0) => Some(*end_path_output.get().get_singleton().unwrap().0),
         Err(_) => unreachable!(),
     }
 }

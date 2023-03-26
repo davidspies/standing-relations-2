@@ -56,6 +56,10 @@ impl<K, V> E1Map<K, V> {
     pub(crate) fn into_singleton(self) -> Option<(K, V)> {
         self.singleton
     }
+
+    pub fn get_singleton(&self) -> Option<(&K, &V)> {
+        self.singleton.as_ref().map(|(k, v)| (k, v))
+    }
 }
 
 impl<K: Eq + Hash, V> E1Map<K, V> {
