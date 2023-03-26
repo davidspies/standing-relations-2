@@ -52,6 +52,10 @@ impl<K, V> E1Map<K, V> {
             .into_iter()
             .chain(self.non_singleton.drain())
     }
+
+    pub(crate) fn into_singleton(self) -> Option<(K, V)> {
+        self.singleton
+    }
 }
 
 impl<K: Eq + Hash, V> E1Map<K, V> {

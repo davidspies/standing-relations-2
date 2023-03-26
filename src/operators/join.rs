@@ -10,8 +10,7 @@ pub struct InnerJoin<K, VL, CL, VR, CR> {
 }
 
 impl<K, VL, CL, VR, CR> InnerJoin<K, VL, CL, VR, CR> {
-    pub fn new(left_rel: Relation<(K, VL), CL>, right_rel: Relation<(K, VR), CR>) -> Self {
-        assert_eq!(left_rel.context_id(), right_rel.context_id());
+    pub fn new((left_rel, right_rel): (Relation<(K, VL), CL>, Relation<(K, VR), CR>)) -> Self {
         Self {
             left_rel,
             right_rel,

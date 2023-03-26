@@ -18,6 +18,7 @@ use crate::{
         save::Saved,
         split::{Split, SplitOp},
     },
+    relation_args::RelationArgs,
     value_count::ValueCount,
 };
 
@@ -34,6 +35,15 @@ impl<T, C> Relation<T, C> {
             context_id,
             operator,
         }
+    }
+
+    pub(crate) fn from_op<Subrels: RelationArgs>(
+        subrels: Subrels,
+        operator: impl FnOnce(Subrels) -> C,
+    ) -> Self {
+        let mut context_ids = E1Map::new();
+        subrels.push_context_ids(&mut context_ids);
+        Self::new(context_ids.into_singleton().unwrap().0, operator(subrels))
     }
 
     pub(crate) fn context_id(&self) -> ContextId {
@@ -55,23 +65,23 @@ impl<T, C> Relation<T, C> {
     }
 
     pub fn flat_map<U, F>(self, f: F) -> Relation<U, FlatMap<T, F, C>> {
-        Relation::new(self.context_id, FlatMap::new(self, f))
+        Relation::from_op(self, |r| FlatMap::new(r, f))
     }
 
     pub fn distinct(self) -> Relation<T, Distinct<T, C>> {
-        Relation::new(self.context_id, Distinct::new(self))
+        Relation::from_op(self, Distinct::new)
     }
 
     pub fn consolidate(self) -> Relation<T, Consolidate<T, C>> {
-        Relation::new(self.context_id, Consolidate::new(self))
+        Relation::from_op(self, Consolidate::new)
     }
 
     pub fn concat<CR>(self, other: Relation<T, CR>) -> Relation<T, Concat<T, C, CR>> {
-        Relation::new(self.context_id, Concat::new(self, other))
+        Relation::from_op((self, other), Concat::new)
     }
 
     pub fn negate(self) -> Relation<T, Negate<T, C>> {
-        Relation::new(self.context_id, Negate::new(self))
+        Relation::from_op(self, Negate::new)
     }
 
     pub fn save(self) -> Saved<T, C> {
@@ -140,18 +150,18 @@ impl<K, V, C> Relation<(K, V), C> {
         self,
         other: Relation<(K, VR), CR>,
     ) -> Relation<(K, V, VR), InnerJoin<K, V, C, VR, CR>> {
-        Relation::new(self.context_id, InnerJoin::new(self, other))
+        Relation::from_op((self, other), InnerJoin::new)
     }
 
     pub fn reduce<Y, F>(self, f: F) -> Relation<(K, Y), Reduce<K, V, Y, F, C>> {
-        Relation::new(self.context_id, Reduce::new(self, f))
+        Relation::from_op(self, |r| Reduce::new(r, f))
     }
 
     pub fn antijoin<CR: Op<K>>(
         self,
         other: Relation<K, CR>,
     ) -> Relation<(K, V), AntiJoin<K, V, C, CR>> {
-        Relation::new(self.context_id, AntiJoin::new(self, other))
+        Relation::from_op((self, other), AntiJoin::new)
     }
 }
 
