@@ -30,6 +30,9 @@ where
     CL: Op<(K, V)>,
     CR: Op<K>,
 {
+    fn type_name(&self) -> &'static str {
+        "anti_join"
+    }
     fn foreach(&mut self, current_id: CommitId, mut f: impl FnMut((K, V), ValueCount)) {
         self.right_rel.foreach(current_id, |k, count| {
             match self.right_values.add(k.clone(), count) {

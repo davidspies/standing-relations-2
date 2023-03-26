@@ -49,6 +49,9 @@ pub struct SplitOp<T, L, R, C> {
 }
 
 impl<T, L, R, C: Op<(L, R)>> Op<T> for SplitOp<T, L, R, C> {
+    fn type_name(&self) -> &'static str {
+        "split"
+    }
     fn foreach(&mut self, current_id: CommitId, mut f: impl FnMut(T, ValueCount)) {
         let mut inner = self.inner.borrow_mut();
         let SplitInner {

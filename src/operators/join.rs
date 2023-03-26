@@ -28,6 +28,9 @@ where
     CL: Op<(K, VL)>,
     CR: Op<(K, VR)>,
 {
+    fn type_name(&self) -> &'static str {
+        "join"
+    }
     fn foreach(&mut self, current_id: CommitId, mut f: impl FnMut((K, VL, VR), ValueCount)) {
         self.left_rel.foreach(current_id, |(k, vl), lcount| {
             for (vr, &rcount) in self.right_values.get(&k).into_iter().flatten() {

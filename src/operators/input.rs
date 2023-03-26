@@ -30,6 +30,9 @@ impl<T> InputOp<T> {
 }
 
 impl<T> Op<T> for InputOp<T> {
+    fn type_name(&self) -> &'static str {
+        "input"
+    }
     fn foreach(&mut self, _current_id: CommitId, mut f: impl FnMut(T, ValueCount)) {
         while let Some((value, count)) = self.0.try_recv() {
             f(value, count)

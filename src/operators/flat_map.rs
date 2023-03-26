@@ -17,6 +17,9 @@ where
     F: Fn(S) -> I,
     C: Op<S>,
 {
+    fn type_name(&self) -> &'static str {
+        "flat_map"
+    }
     fn foreach(&mut self, current_id: CommitId, mut f: impl FnMut(T, ValueCount)) {
         self.sub_rel.foreach(current_id, |x, count| {
             for y in (self.f)(x) {

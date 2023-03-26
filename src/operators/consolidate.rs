@@ -17,6 +17,9 @@ impl<T, C> Consolidate<T, C> {
 }
 
 impl<T: Eq + Hash, C: Op<T>> Op<T> for Consolidate<T, C> {
+    fn type_name(&self) -> &'static str {
+        "consolidate"
+    }
     fn foreach(&mut self, current_id: CommitId, mut f: impl FnMut(T, ValueCount)) {
         self.sub_rel.foreach(current_id, |value, count| {
             self.collected_scratch.add(value, count);

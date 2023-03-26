@@ -1,10 +1,10 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, rc::Rc, sync::Arc};
 
 use crate::{
     broadcast_channel::{Receiver, Sender},
     context::CommitId,
     op::{DynOp, Op},
-    relation::Relation,
+    relation::{data::RelationData, Relation},
     value_count::ValueCount,
 };
 
@@ -32,22 +32,30 @@ pub struct SavedOp<T, C> {
     receiver: Receiver<(T, ValueCount)>,
 }
 
-impl<T, C> Saved<T, C> {
+impl<T: Clone, C: Op<T>> Saved<T, C> {
     pub fn get(&self) -> Relation<T, SavedOp<T, C>> {
         let mut inner = self.0.borrow_mut();
         let receiver = inner.sender.subscribe();
         let context_id = inner.sub_rel.context_id();
+        let operator = SavedOp {
+            inner: self.0.clone(),
+            receiver,
+        };
         Relation::new(
             context_id,
-            SavedOp {
-                inner: self.0.clone(),
-                receiver,
-            },
+            Arc::new(RelationData::new(
+                Op::type_name(&operator),
+                vec![inner.sub_rel.data()],
+            )),
+            operator,
         )
     }
 }
 
 impl<T: Clone, C: Op<T>> Op<T> for SavedOp<T, C> {
+    fn type_name(&self) -> &'static str {
+        "save"
+    }
     fn foreach(&mut self, current_id: CommitId, mut f: impl FnMut(T, ValueCount)) {
         if self.inner.borrow().last_id < current_id {
             let mut inner = self.inner.borrow_mut();

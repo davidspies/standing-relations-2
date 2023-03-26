@@ -34,6 +34,9 @@ where
     F: Fn(&K, &E1Map<V, ValueCount>) -> Y,
     C: Op<(K, V)>,
 {
+    fn type_name(&self) -> &'static str {
+        "reduce"
+    }
     fn foreach(&mut self, current_id: CommitId, mut f: impl FnMut((K, Y), ValueCount)) {
         self.sub_rel.foreach(current_id, |(k, v), count| {
             self.aggregated_values.add(k.clone(), (v, count));

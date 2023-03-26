@@ -1,4 +1,4 @@
-use std::{cell::Cell, hash::Hash, rc::Rc};
+use std::{cell::Cell, hash::Hash, rc::Rc, sync::Arc};
 
 use index_list::IndexList;
 use uuid::Uuid;
@@ -11,7 +11,7 @@ use crate::{
         save::Saved,
     },
     output::Output,
-    relation::Relation,
+    relation::{data::RelationData, Relation},
     value_count::ValueCount,
 };
 
@@ -52,9 +52,14 @@ impl<'a> CreationContext<'a> {
         let (sender2, receiver2) = channel::new::<(T, ValueCount)>();
         self.input_pipes
             .push(Box::new(TrackedInputPipe::new(receiver1, sender2)));
+        let operator = InputOp::new(receiver2);
         (
             Input::new(sender1),
-            Relation::new(self.id, InputOp::new(receiver2)),
+            Relation::new(
+                self.id,
+                Arc::new(RelationData::new(operator.type_name(), vec![])),
+                operator,
+            ),
         )
     }
     pub fn frameless_input<T: 'a>(&mut self) -> (Input<T>, Relation<T, InputOp<T>>) {
@@ -62,9 +67,14 @@ impl<'a> CreationContext<'a> {
         let (sender2, receiver2) = channel::new::<(T, ValueCount)>();
         self.input_pipes
             .push(Box::new(UntrackedInputPipe::new(receiver1, sender2)));
+        let operator = InputOp::new(receiver2);
         (
             Input::new(sender1),
-            Relation::new(self.id, InputOp::new(receiver2)),
+            Relation::new(
+                self.id,
+                Arc::new(RelationData::new(operator.type_name(), vec![])),
+                operator,
+            ),
         )
     }
     pub fn feedback<T: Eq + Hash + Clone + 'a>(
