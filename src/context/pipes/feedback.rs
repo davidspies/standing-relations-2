@@ -55,9 +55,6 @@ impl<T: Eq + Hash + Clone, C: Op<T>> PipeT for FeedbackPipe<T, C> {
         let frame = self.frame_changes.pop().unwrap();
         for elem in frame {
             self.seen.remove(&elem);
-            if self.input.unsend(elem).is_err() {
-                return Err(Dropped);
-            }
         }
         Ok(())
     }
