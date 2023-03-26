@@ -73,8 +73,8 @@ impl<T, C> Relation<T, C> {
         }
     }
 
-    pub fn named(mut self, name: String) -> Self {
-        self.data.set_name(name);
+    pub fn named(mut self, name: impl Into<String>) -> Self {
+        self.data.set_name(name.into());
         self
     }
 
