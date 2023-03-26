@@ -11,10 +11,12 @@ pub(crate) trait RelationArgs {
     fn push_datas(self, _v: &mut Vec<Arc<RelationData>>) -> Self::Inner;
 }
 
-impl RelationArgs for () {
+impl RelationArgs for ContextId {
     type Inner = ();
 
-    fn add_context_ids(&self, _s: &mut E1Map<ContextId, isize>) {}
+    fn add_context_ids(&self, s: &mut E1Map<ContextId, isize>) {
+        s.add(*self, 1);
+    }
     fn push_datas(self, _v: &mut Vec<Arc<RelationData>>) -> Self::Inner {}
 }
 
