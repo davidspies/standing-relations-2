@@ -1,6 +1,15 @@
 #![allow(clippy::type_complexity)]
 
-use std::{convert::identity, hash::Hash, iter, marker::PhantomData, sync::Arc};
+use std::{
+    convert::identity,
+    hash::Hash,
+    iter,
+    marker::PhantomData,
+    sync::{
+        atomic::{self, AtomicUsize},
+        Arc,
+    },
+};
 
 use crate::{
     context::{CommitId, ContextId},
@@ -35,15 +44,19 @@ pub struct Relation<T, C = Box<dyn DynOp<T>>> {
 
 pub(crate) struct RelationInner<T, C> {
     phantom: PhantomData<T>,
+    visit_count: Arc<AtomicUsize>,
     operator: C,
 }
 
 impl<T, C> RelationInner<T, C> {
-    pub(crate) fn foreach(&mut self, current_id: CommitId, f: impl FnMut(T, ValueCount))
+    pub(crate) fn foreach(&mut self, current_id: CommitId, mut f: impl FnMut(T, ValueCount))
     where
         C: Op<T>,
     {
-        self.operator.foreach(current_id, f)
+        self.operator.foreach(current_id, |x, v| {
+            self.visit_count.fetch_add(1, atomic::Ordering::Relaxed);
+            f(x, v)
+        })
     }
 }
 
@@ -51,11 +64,12 @@ impl<T, C> Relation<T, C> {
     pub(crate) fn new(context_id: ContextId, data: RelationData, operator: C) -> Self {
         Self {
             context_id,
-            data,
             inner: RelationInner {
                 phantom: PhantomData,
+                visit_count: data.visit_count.clone(),
                 operator,
             },
+            data,
         }
     }
 
