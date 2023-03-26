@@ -15,9 +15,9 @@ fn dijkstra<Node: Debug + Eq + Hash + Clone>(
 
     let (path_input, path_len) = context.input::<(Node, usize)>();
     let path_len = path_len.concat(start_rel.map(|n| (n, 0)));
-    let min_path = path_len.mins().dynamic().save();
+    let min_path = path_len.mins().collect();
 
-    let path_to_end = min_path.get().semijoin(end_rel).snds().dynamic().save();
+    let path_to_end = min_path.get().semijoin(end_rel).snds().collect();
     let end_path_output = context.output(path_to_end.get());
     context.interrupt(0, path_to_end.get());
 
@@ -28,9 +28,9 @@ fn dijkstra<Node: Debug + Eq + Hash + Clone>(
 
     let (path_distance_input, path_distances) = context.input::<usize>();
 
-    let larger_next_paths = next_path.antijoin(path_distances).dynamic().save();
+    let larger_next_paths = next_path.antijoin(path_distances).collect();
 
-    let next_path_distance = larger_next_paths.get().fsts().global_min().dynamic().save();
+    let next_path_distance = larger_next_paths.get().fsts().global_min().collect();
 
     let actual_next_paths = larger_next_paths
         .get()
