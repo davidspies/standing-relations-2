@@ -169,16 +169,13 @@ impl ExecutionContext<'_> {
             i = next_i;
         }
 
-        self.one_pass();
-
         result
     }
 
     fn one_pass(&mut self) {
         self.commit_id.set(CommitId(self.commit_id.get().0 + 1));
-        let commit_id = self.commit_id.get();
         self.input_pipes
-            .retain_mut(|pipe| pipe.process(commit_id).is_ok());
+            .retain_mut(|pipe| pipe.process(self.commit_id.get()).is_ok());
     }
 }
 
