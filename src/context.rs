@@ -6,7 +6,10 @@ use uuid::Uuid;
 use crate::{
     channel,
     op::Op,
-    operators::input::{Input, InputOp},
+    operators::{
+        input::{Input, InputOp},
+        save::Saved,
+    },
     output::Output,
     relation::Relation,
     value_count::ValueCount,
@@ -79,6 +82,15 @@ impl<'a> CreationContext<'a> {
     ) {
         self.feedback_pipes
             .insert_last(Box::new(Interrupt::new(id, relation)));
+    }
+    pub fn first_occurrences<K: Eq + Hash + Clone + 'a, V: Eq + Hash + Clone + 'a>(
+        &mut self,
+        relation: Relation<(K, V), impl Op<(K, V)> + 'a>,
+    ) -> Saved<(K, V), InputOp<(K, V)>> {
+        let (input, input_rel) = self.input();
+        let input_rel = input_rel.save();
+        self.feedback(relation.antijoin(input_rel.get().fsts()), input);
+        input_rel
     }
     pub fn output<T, C>(&mut self, relation: Relation<T, C>) -> Output<T, C> {
         Output::new(relation, self.commit_id.clone())

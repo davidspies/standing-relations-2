@@ -1,4 +1,4 @@
-use crate::{context::ContextId, E1Map, Relation};
+use crate::{context::ContextId, e1map::E1Map, relation::Relation};
 
 pub(crate) trait RelationArgs {
     fn push_context_ids(&self, s: &mut E1Map<ContextId, isize>);
