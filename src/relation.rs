@@ -1,7 +1,6 @@
 #![allow(clippy::type_complexity)]
 
 use std::{
-    collections::BTreeMap,
     convert::identity,
     hash::Hash,
     iter,
@@ -14,7 +13,7 @@ use std::{
 
 use crate::{
     context::{CommitId, ContextId},
-    e1map::E1Map,
+    e1map::{E1BTreeMap, E1Map},
     op::{DynOp, Op},
     operators::{
         antijoin::AntiJoin,
@@ -273,7 +272,7 @@ where
         V: Ord,
     {
         Relation::from_op(self, |r| {
-            Reduce::new(r, |_: &K, vals: &BTreeMap<V, ValueCount>| {
+            Reduce::new(r, |_: &K, vals: &E1BTreeMap<V, ValueCount>| {
                 vals.last_key_value().unwrap().0.clone()
             })
         })
@@ -285,7 +284,7 @@ where
         V: Ord,
     {
         Relation::from_op(self, |r| {
-            Reduce::new(r, |_: &K, vals: &BTreeMap<V, ValueCount>| {
+            Reduce::new(r, |_: &K, vals: &E1BTreeMap<V, ValueCount>| {
                 vals.first_key_value().unwrap().0.clone()
             })
         })
@@ -308,12 +307,14 @@ impl<L, R, C: Op<(L, R)>> Relation<(L, R), C> {
                 context_id,
                 RelationData::new(Op::type_name(&left), children.clone()),
                 left,
-            ),
+            )
+            .hidden(),
             Relation::new(
                 context_id,
                 RelationData::new(Op::type_name(&right), children),
                 right,
-            ),
+            )
+            .hidden(),
         )
     }
     pub fn fsts(self) -> Relation<L, impl Op<L>>

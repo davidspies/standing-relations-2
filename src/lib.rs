@@ -12,6 +12,7 @@ mod broadcast_channel;
 mod channel;
 mod context;
 mod e1map;
+mod is_map;
 mod nullable;
 mod op;
 mod operators;
