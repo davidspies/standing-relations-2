@@ -106,17 +106,18 @@ impl<K: Eq, V, M: IsMap<K, V>> E1Map<K, V, M> {
         match self.singleton_key.take() {
             Some(k) => {
                 if key == k {
-                    self.singleton_key = Some(k);
                     let result = value.add_to(&mut self.singleton_value);
-                    if self.singleton_value.is_empty() {
-                        self.singleton_key = None
+                    if !self.singleton_value.is_empty() {
+                        self.singleton_key = Some(k);
                     }
                     result
                 } else {
-                    self.non_singleton = M::from_singleton(k, mem::take(&mut self.singleton_value));
-                    let v = self.non_singleton.entry_or_default(key);
-                    let result = value.add_to(v);
-                    assert!(!v.is_empty());
+                    let replaced = self
+                        .non_singleton
+                        .insert(k, mem::take(&mut self.singleton_value));
+                    assert!(replaced.is_none());
+                    let result = self.non_singleton.add(key, value);
+                    assert_eq!(self.non_singleton.len(), 2);
                     result
                 }
             }

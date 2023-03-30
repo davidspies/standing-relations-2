@@ -14,10 +14,7 @@ pub trait IsMap<K, V>: Nullable {
     fn drain(&mut self) -> Self::DrainIter<'_>;
     fn contains_key(&self, key: &K) -> bool;
     fn get(&self, key: &K) -> Option<&V>;
-    fn from_singleton(key: K, value: V) -> Self;
-    fn entry_or_default(&mut self, key: K) -> &mut V
-    where
-        V: Default;
+    fn insert(&mut self, key: K, value: V) -> Option<V>;
     fn add<Val: AddToValue<V>>(&mut self, key: K, value: Val) -> ValueChanges
     where
         V: Nullable;
@@ -38,14 +35,8 @@ impl<K: Eq + Hash, V> IsMap<K, V> for HashMap<K, V> {
     fn get(&self, key: &K) -> Option<&V> {
         self.get(key)
     }
-    fn from_singleton(key: K, value: V) -> Self {
-        Self::from_iter([(key, value)])
-    }
-    fn entry_or_default(&mut self, key: K) -> &mut V
-    where
-        V: Default,
-    {
-        self.entry(key).or_default()
+    fn insert(&mut self, key: K, value: V) -> Option<V> {
+        self.insert(key, value)
     }
     fn add<Val: AddToValue<V>>(&mut self, key: K, value: Val) -> ValueChanges
     where
@@ -84,14 +75,8 @@ impl<K: Ord, V> IsMap<K, V> for BTreeMap<K, V> {
     fn get(&self, key: &K) -> Option<&V> {
         self.get(key)
     }
-    fn from_singleton(key: K, value: V) -> Self {
-        Self::from_iter([(key, value)])
-    }
-    fn entry_or_default(&mut self, key: K) -> &mut V
-    where
-        V: Default,
-    {
-        self.entry(key).or_default()
+    fn insert(&mut self, key: K, value: V) -> Option<V> {
+        self.insert(key, value)
     }
     fn add<Val: AddToValue<V>>(&mut self, key: K, value: Val) -> ValueChanges
     where
