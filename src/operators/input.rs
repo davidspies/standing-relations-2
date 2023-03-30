@@ -10,7 +10,7 @@ use crate::{
 #[derive(Derivative)]
 #[derivative(Clone(bound = ""))]
 pub struct Input<T> {
-    context_id: ContextId,
+    pub(crate) context_id: ContextId,
     sender: Sender<(T, isize)>,
 }
 

@@ -75,6 +75,8 @@ impl<'a> CreationContext<'a> {
         relation: Relation<T, impl Op<T> + 'a>,
         input: Input<T>,
     ) {
+        assert_eq!(self.id, relation.context_id);
+        assert_eq!(self.id, input.context_id);
         self.add_all(&Arc::new(relation.data));
         self.feedback_pipes
             .insert_last(Box::new(FeedbackPipe::new(relation.inner, input)));
@@ -84,6 +86,7 @@ impl<'a> CreationContext<'a> {
         id: InterruptId,
         relation: Relation<T, C>,
     ) {
+        assert_eq!(self.id, relation.context_id);
         self.add_all(&Arc::new(relation.data));
         self.feedback_pipes
             .insert_last(Box::new(Interrupt::new(id, relation.inner)));
@@ -92,12 +95,14 @@ impl<'a> CreationContext<'a> {
         &mut self,
         relation: Relation<(K, V), impl Op<(K, V)> + 'a>,
     ) -> Saved<(K, V), InputOp<(K, V)>> {
+        assert_eq!(self.id, relation.context_id);
         let (input, input_rel) = self.input();
         let input_rel = input_rel.save();
         self.feedback(relation.antijoin(input_rel.get().fsts()), input);
         input_rel
     }
     pub fn output<T, C>(&mut self, relation: Relation<T, C>) -> Output<T, C> {
+        assert_eq!(self.id, relation.context_id);
         self.add_all(&Arc::new(relation.data));
         Output::new(relation.inner, self.commit_id.clone())
     }
