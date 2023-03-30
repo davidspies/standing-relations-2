@@ -1,3 +1,5 @@
+use derivative::Derivative;
+
 use crate::{
     channel::{Receiver, Sender},
     context::CommitId,
@@ -5,6 +7,8 @@ use crate::{
     value_count::ValueCount,
 };
 
+#[derive(Derivative)]
+#[derivative(Clone(bound = ""))]
 pub struct Input<T>(Sender<(T, isize)>);
 
 impl<T> Input<T> {
