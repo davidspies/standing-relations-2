@@ -2,26 +2,29 @@ use derivative::Derivative;
 
 use crate::{
     channel::{Receiver, Sender},
-    context::CommitId,
+    context::{CommitId, ContextId},
     op::Op,
     value_count::ValueCount,
 };
 
 #[derive(Derivative)]
 #[derivative(Clone(bound = ""))]
-pub struct Input<T>(Sender<(T, isize)>);
+pub struct Input<T> {
+    context_id: ContextId,
+    sender: Sender<(T, isize)>,
+}
 
 impl<T> Input<T> {
-    pub(crate) fn new(sender: Sender<(T, isize)>) -> Self {
-        Self(sender)
+    pub(crate) fn new(context_id: ContextId, sender: Sender<(T, isize)>) -> Self {
+        Self { context_id, sender }
     }
 
     pub fn send(&mut self, elem: T) -> Result<(), T> {
-        self.0.send((elem, 1)).map_err(|(elem, _)| elem)
+        self.sender.send((elem, 1)).map_err(|(elem, _)| elem)
     }
 
     pub fn unsend(&mut self, elem: T) -> Result<(), T> {
-        self.0.send((elem, -1)).map_err(|(elem, _)| elem)
+        self.sender.send((elem, -1)).map_err(|(elem, _)| elem)
     }
 }
 

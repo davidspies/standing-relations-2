@@ -56,7 +56,7 @@ impl<'a> CreationContext<'a> {
         self.input_pipes
             .push(Box::new(TrackedInputPipe::new(receiver1, sender2)));
         (
-            Input::new(sender1),
+            Input::new(self.id, sender1),
             Relation::from_op(self.id, move |()| InputOp::new(receiver2)),
         )
     }
@@ -66,7 +66,7 @@ impl<'a> CreationContext<'a> {
         self.input_pipes
             .push(Box::new(UntrackedInputPipe::new(receiver1, sender2)));
         (
-            Input::new(sender1),
+            Input::new(self.id, sender1),
             Relation::from_op(self.id, move |()| InputOp::new(receiver2)),
         )
     }
