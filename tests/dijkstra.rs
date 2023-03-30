@@ -16,61 +16,55 @@ fn dijkstra<Node: Debug + Eq + Hash + Clone>(
     let (mut edges_input, edges_rel) = context.input::<(Node, Node, usize)>();
     let edges_rel = edges_rel.named("edges");
 
-    let (path_input, path_len) = context.input::<(Node, usize)>();
-    let path_len = path_len.concat(start_rel.map(|n| (n, 0))).named("path_len");
-    let min_path = path_len.mins().named("min_path").collect();
+    let (distances_input, distances) = context.input::<(Node, usize)>();
+    let distances = distances
+        .concat(start_rel.map(|n| (n, 0)))
+        .named("distances")
+        .collect();
 
-    let path_to_end = min_path
+    let distance_to_end = distances
         .get()
         .semijoin(end_rel)
         .snds()
-        .named("path_to_end")
+        .named("distance_to_end")
         .collect();
-    let end_path_output = context.output(path_to_end.get());
-    context.interrupt(0, path_to_end.get());
+    let end_distance_output = context.output(distance_to_end.get());
+    context.interrupt(0, distance_to_end.get());
 
-    let next_path = min_path
+    let next_distances = distances
         .get()
         .join(edges_rel.map(|(from, to, dist)| (from, (to, dist))))
-        .map(|(_, prev_dist, (to, edge_dist))| (prev_dist + edge_dist, to))
-        .named("next_path");
-
-    let (path_distance_input, path_distances) = context.input::<usize>();
-    let path_distances = path_distances.named("path_distances");
-
-    let larger_next_paths = next_path
-        .antijoin(path_distances)
-        .named("larger_next_paths")
+        .map(|(_, prev_dist, (to, edge_dist))| (to, prev_dist + edge_dist))
+        .antijoin(distances.get().fsts())
+        .named("next_distances")
         .collect();
 
-    let next_path_distance = larger_next_paths
+    let selection_distance = next_distances
         .get()
-        .fsts()
+        .snds()
         .global_min()
-        .named("next_path_distance")
-        .collect();
+        .named("selection_distance");
 
-    let actual_next_paths = larger_next_paths
+    let selected_next_distances = next_distances
         .get()
-        .semijoin(next_path_distance.get())
         .swaps()
-        .named("actual_next_paths");
+        .semijoin(selection_distance)
+        .swaps()
+        .named("selected_next_distances");
 
-    context.feedback(actual_next_paths, path_input);
-
-    context.feedback(next_path_distance.get(), path_distance_input);
+    context.feedback(selected_next_distances, distances_input);
 
     let mut context = context.begin();
 
     start_input.send(start).unwrap();
+    end_input.send(end).unwrap();
     for edge in edge_weights {
         edges_input.send(edge).unwrap();
     }
-    end_input.send(end).unwrap();
 
     match context.commit() {
         Ok(()) => None,
-        Err(0) => Some(*end_path_output.get().get_singleton().unwrap().0),
+        Err(0) => Some(*end_distance_output.get().get_singleton().unwrap().0),
         Err(_) => unreachable!(),
     }
 }
