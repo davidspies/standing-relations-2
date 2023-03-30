@@ -4,17 +4,20 @@ use std::{
     mem,
 };
 
-use crate::{context::CommitId, e1map::E1Map, op::Op, relation::RelationInner, value_count::ValueCount};
+use crate::{
+    add_to_value::AddToValue, context::CommitId, e1map::E1Map, nullable::Nullable, op::Op,
+    relation::RelationInner, value_count::ValueCount,
+};
 
-pub struct Reduce<K, V, Y, F, C> {
+pub struct Reduce<K, V, Y, F, M, C> {
     sub_rel: RelationInner<(K, V), C>,
     f: F,
-    aggregated_values: E1Map<K, E1Map<V, ValueCount>>,
+    aggregated_values: E1Map<K, M>,
     outputs: HashMap<K, Y>,
     changed_keys_scratch: HashSet<K>,
 }
 
-impl<K, V, Y, F, C> Reduce<K, V, Y, F, C> {
+impl<K, V, Y, F, M, C> Reduce<K, V, Y, F, M, C> {
     pub(crate) fn new(sub_rel: RelationInner<(K, V), C>, f: F) -> Self {
         Self {
             sub_rel,
@@ -26,12 +29,14 @@ impl<K, V, Y, F, C> Reduce<K, V, Y, F, C> {
     }
 }
 
-impl<K, V, Y, F, C> Op<(K, Y)> for Reduce<K, V, Y, F, C>
+impl<K, V, Y, F, M, C> Op<(K, Y)> for Reduce<K, V, Y, F, M, C>
 where
     K: Eq + Hash + Clone,
     V: Eq + Hash,
     Y: Eq + Clone,
-    F: Fn(&K, &E1Map<V, ValueCount>) -> Y,
+    F: Fn(&K, &M) -> Y,
+    M: Nullable,
+    (V, ValueCount): AddToValue<M>,
     C: Op<(K, V)>,
 {
     fn type_name(&self) -> &'static str {

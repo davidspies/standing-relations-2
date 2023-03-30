@@ -1,6 +1,7 @@
 #![allow(clippy::type_complexity)]
 
 use std::{
+    collections::BTreeMap,
     convert::identity,
     hash::Hash,
     iter,
@@ -247,7 +248,7 @@ where
     pub fn reduce<Y, F: Fn(&K, &E1Map<V, ValueCount>) -> Y>(
         self,
         f: F,
-    ) -> Relation<(K, Y), Reduce<K, V, Y, F, C>>
+    ) -> Relation<(K, Y), Reduce<K, V, Y, F, E1Map<V, ValueCount>, C>>
     where
         Y: Eq + Clone,
     {
@@ -271,16 +272,24 @@ where
     where
         V: Ord,
     {
-        self.reduce(|_, vals| vals.iter().map(|(v, _)| v).max().unwrap().clone())
-            .type_named("maxes")
+        Relation::from_op(self, |r| {
+            Reduce::new(r, |_: &K, vals: &BTreeMap<V, ValueCount>| {
+                vals.last_key_value().unwrap().0.clone()
+            })
+        })
+        .type_named("maxes")
     }
 
     pub fn mins(self) -> Relation<(K, V), impl Op<(K, V)>>
     where
         V: Ord,
     {
-        self.reduce(|_, vals| vals.iter().map(|(v, _)| v).min().unwrap().clone())
-            .type_named("mins")
+        Relation::from_op(self, |r| {
+            Reduce::new(r, |_: &K, vals: &BTreeMap<V, ValueCount>| {
+                vals.first_key_value().unwrap().0.clone()
+            })
+        })
+        .type_named("mins")
     }
 }
 
