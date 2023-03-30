@@ -1,9 +1,10 @@
-use std::{cell::Cell, hash::Hash, rc::Rc};
+use std::{cell::Cell, collections::HashSet, hash::Hash, rc::Rc, sync::Arc};
 
 use index_list::IndexList;
 use uuid::Uuid;
 
 use crate::{
+    arc_key::ArcKey,
     channel,
     op::Op,
     operators::{
@@ -11,7 +12,7 @@ use crate::{
         save::Saved,
     },
     output::Output,
-    relation::Relation,
+    relation::{data::RelationData, Relation},
     value_count::ValueCount,
 };
 
@@ -36,6 +37,7 @@ pub struct CreationContext<'a> {
     commit_id: Rc<Cell<CommitId>>,
     input_pipes: Vec<Box<dyn PipeT + 'a>>,
     feedback_pipes: IndexList<Box<dyn PipeT + 'a>>,
+    relational_graph: HashSet<ArcKey<RelationData>>,
 }
 
 impl<'a> CreationContext<'a> {
@@ -45,6 +47,7 @@ impl<'a> CreationContext<'a> {
             commit_id: Rc::new(Cell::new(CommitId(0))),
             input_pipes: Vec::new(),
             feedback_pipes: IndexList::new(),
+            relational_graph: HashSet::new(),
         }
     }
     pub fn input<T: Eq + Hash + Clone + 'a>(&mut self) -> (Input<T>, Relation<T, InputOp<T>>) {
@@ -72,6 +75,7 @@ impl<'a> CreationContext<'a> {
         relation: Relation<T, impl Op<T> + 'a>,
         input: Input<T>,
     ) {
+        self.add_all(&Arc::new(relation.data));
         self.feedback_pipes
             .insert_last(Box::new(FeedbackPipe::new(relation.inner, input)));
     }
@@ -80,6 +84,7 @@ impl<'a> CreationContext<'a> {
         id: InterruptId,
         relation: Relation<T, C>,
     ) {
+        self.add_all(&Arc::new(relation.data));
         self.feedback_pipes
             .insert_last(Box::new(Interrupt::new(id, relation.inner)));
     }
@@ -93,6 +98,7 @@ impl<'a> CreationContext<'a> {
         input_rel
     }
     pub fn output<T, C>(&mut self, relation: Relation<T, C>) -> Output<T, C> {
+        self.add_all(&Arc::new(relation.data));
         Output::new(relation.inner, self.commit_id.clone())
     }
     pub fn begin(self) -> ExecutionContext<'a> {
@@ -101,11 +107,20 @@ impl<'a> CreationContext<'a> {
             commit_id,
             input_pipes,
             feedback_pipes,
+            relational_graph: _,
         } = self;
         ExecutionContext {
             commit_id,
             input_pipes,
             feedback_pipes,
+        }
+    }
+
+    fn add_all(&mut self, data: &Arc<RelationData>) {
+        if self.relational_graph.insert(ArcKey(data.clone())) {
+            for child in data.children.iter() {
+                self.add_all(&child);
+            }
         }
     }
 }

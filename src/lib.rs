@@ -7,6 +7,7 @@ pub use self::relation::Relation;
 pub use self::value_count::ValueCount;
 
 mod add_to_value;
+mod arc_key;
 mod broadcast_channel;
 mod channel;
 mod context;
