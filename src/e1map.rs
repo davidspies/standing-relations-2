@@ -2,7 +2,7 @@ use std::{
     collections::{BTreeMap, HashMap},
     hash::Hash,
     iter::Chain,
-    option,
+    mem, option,
 };
 
 use derivative::Derivative;
@@ -14,9 +14,10 @@ use crate::{
 };
 
 #[derive(Debug, Derivative)]
-#[derivative(Default(bound = "M: Default"))]
+#[derivative(Default(bound = "V: Default, M: Default"))]
 pub struct E1Map<K, V, M = HashMap<K, V>> {
-    singleton: Option<(K, V)>,
+    singleton_key: Option<K>,
+    singleton_value: V,
     non_singleton: M,
 }
 
@@ -29,6 +30,7 @@ pub type IntoIter<K, V, M = HashMap<K, V>> =
 impl<K, V, M> E1Map<K, V, M> {
     pub fn new() -> Self
     where
+        V: Default,
         M: Default,
     {
         Self::default()
@@ -38,16 +40,14 @@ impl<K, V, M> E1Map<K, V, M> {
     where
         M: Nullable,
     {
-        self.singleton.is_none() && self.non_singleton.is_empty()
+        self.singleton_key.is_none() && self.non_singleton.is_empty()
     }
 
     pub fn iter<'a>(&'a self) -> Iter<'a, K, V, M>
     where
         &'a M: IntoIterator<Item = (&'a K, &'a V)>,
     {
-        self.singleton
-            .as_ref()
-            .map(|(k, v)| (k, v))
+        self.get_singleton()
             .into_iter()
             .chain(self.non_singleton.into_iter())
     }
@@ -56,38 +56,45 @@ impl<K, V, M> E1Map<K, V, M> {
     where
         M: IntoIterator<Item = (K, V)>,
     {
-        self.singleton
+        self.singleton_key
+            .map(|k| (k, self.singleton_value))
             .into_iter()
             .chain(self.non_singleton.into_iter())
     }
 
     pub(crate) fn into_singleton(self) -> Option<(K, V)> {
-        self.singleton
+        self.singleton_key.map(|k| (k, self.singleton_value))
     }
 
     pub fn get_singleton(&self) -> Option<(&K, &V)> {
-        self.singleton.as_ref().map(|(k, v)| (k, v))
+        self.singleton_key
+            .as_ref()
+            .map(|k| (k, &self.singleton_value))
     }
 }
 
 impl<K: Eq, V, M: IsMap<K, V>> E1Map<K, V, M> {
-    pub(crate) fn drain(&mut self) -> impl Iterator<Item = (K, V)> + '_ {
-        self.singleton
+    pub(crate) fn drain(&mut self) -> impl Iterator<Item = (K, V)> + '_
+    where
+        V: Default,
+    {
+        self.singleton_key
             .take()
+            .map(|k| (k, mem::take(&mut self.singleton_value)))
             .into_iter()
             .chain(self.non_singleton.drain())
     }
 
     pub fn contains_key(&self, key: &K) -> bool {
-        match &self.singleton {
-            Some((k, _)) => key == k,
+        match &self.singleton_key {
+            Some(k) => key == k,
             None => self.non_singleton.contains_key(key),
         }
     }
 
     pub fn get(&self, key: &K) -> Option<&V> {
-        match &self.singleton {
-            Some((k, v)) => (key == k).then_some(v),
+        match &self.singleton_key {
+            Some(k) => (key == k).then_some(&self.singleton_value),
             None => self.non_singleton.get(key),
         }
     }
@@ -96,42 +103,35 @@ impl<K: Eq, V, M: IsMap<K, V>> E1Map<K, V, M> {
     where
         V: Nullable,
     {
-        match self.singleton.take() {
-            Some((k, v)) => {
+        match self.singleton_key.take() {
+            Some(k) => {
                 if key == k {
-                    self.singleton = Some((k, v));
-                    let v = &mut self.singleton.as_mut().unwrap().1;
-                    let result = value.add_to(v);
-                    if v.is_empty() {
-                        self.singleton = None
+                    self.singleton_key = Some(k);
+                    let result = value.add_to(&mut self.singleton_value);
+                    if self.singleton_value.is_empty() {
+                        self.singleton_key = None
                     }
                     result
                 } else {
-                    self.non_singleton = M::from_singleton(k, v);
+                    self.non_singleton = M::from_singleton(k, mem::take(&mut self.singleton_value));
                     let v = self.non_singleton.entry_or_default(key);
                     let result = value.add_to(v);
-                    if v.is_empty() {
-                        panic!("Still empty")
-                    }
+                    assert!(!v.is_empty());
                     result
                 }
             }
             None => {
                 if self.non_singleton.is_empty() {
-                    self.singleton = Some((key, V::default()));
-                    let v = &mut self.singleton.as_mut().unwrap().1;
-                    let result = value.add_to(v);
-                    if v.is_empty() {
-                        panic!("Still empty")
-                    }
+                    self.singleton_key = Some(key);
+                    let result = value.add_to(&mut self.singleton_value);
+                    assert!(!self.singleton_value.is_empty());
                     result
                 } else {
-                    let result = self
-                        .non_singleton
-                        .on_entry_then_remove_null_or_on_insert_default(key, |v| value.add_to(v));
+                    let result = self.non_singleton.add(key, value);
                     if self.non_singleton.len() == 1 {
                         let (k, v) = self.non_singleton.drain().next().unwrap();
-                        self.singleton = Some((k, v));
+                        self.singleton_key = Some(k);
+                        self.singleton_value = v;
                     }
                     result
                 }
@@ -144,15 +144,15 @@ pub type E1BTreeMap<K, V> = E1Map<K, V, BTreeMap<K, V>>;
 
 impl<K: Ord, V> E1BTreeMap<K, V> {
     pub fn first_key_value(&self) -> Option<(&K, &V)> {
-        match &self.singleton {
-            Some((k, v)) => Some((k, v)),
+        match &self.singleton_key {
+            Some(k) => Some((k, &self.singleton_value)),
             None => self.non_singleton.first_key_value(),
         }
     }
 
     pub fn last_key_value(&self) -> Option<(&K, &V)> {
-        match &self.singleton {
-            Some((k, v)) => Some((k, v)),
+        match &self.singleton_key {
+            Some(k) => Some((k, &self.singleton_value)),
             None => self.non_singleton.last_key_value(),
         }
     }
@@ -184,7 +184,7 @@ where
     }
 }
 
-impl<K, V, M: Nullable> Nullable for E1Map<K, V, M> {
+impl<K, V: Default, M: Nullable> Nullable for E1Map<K, V, M> {
     fn is_empty(&self) -> bool {
         self.is_empty()
     }

@@ -2,12 +2,12 @@ use std::collections::{btree_map, BTreeMap};
 
 use crate::nullable::Nullable;
 
-pub(crate) trait AddToValue<V> {
+pub trait AddToValue<V> {
     #[must_use]
     fn add_to(self, v: &mut V) -> ValueChanges;
 }
 
-pub(crate) struct ValueChanges {
+pub struct ValueChanges {
     pub(crate) was_zero: bool,
     pub(crate) is_zero: bool,
 }

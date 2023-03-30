@@ -2,6 +2,7 @@ use std::collections::{btree_map, hash_map, BTreeMap, HashMap};
 use std::hash::Hash;
 use std::mem;
 
+use crate::add_to_value::{AddToValue, ValueChanges};
 use crate::nullable::Nullable;
 
 pub trait IsMap<K, V>: Nullable {
@@ -17,11 +18,7 @@ pub trait IsMap<K, V>: Nullable {
     fn entry_or_default(&mut self, key: K) -> &mut V
     where
         V: Default;
-    fn on_entry_then_remove_null_or_on_insert_default<R>(
-        &mut self,
-        key: K,
-        f: impl FnOnce(&mut V) -> R,
-    ) -> R
+    fn add<Val: AddToValue<V>>(&mut self, key: K, value: Val) -> ValueChanges
     where
         V: Nullable;
 }
@@ -50,23 +47,24 @@ impl<K: Eq + Hash, V> IsMap<K, V> for HashMap<K, V> {
     {
         self.entry(key).or_default()
     }
-    fn on_entry_then_remove_null_or_on_insert_default<R>(
-        &mut self,
-        key: K,
-        f: impl FnOnce(&mut V) -> R,
-    ) -> R
+    fn add<Val: AddToValue<V>>(&mut self, key: K, value: Val) -> ValueChanges
     where
         V: Nullable,
     {
         match self.entry(key) {
             hash_map::Entry::Occupied(mut occ) => {
-                let result = f(occ.get_mut());
+                let result = value.add_to(occ.get_mut());
                 if occ.get().is_empty() {
                     occ.remove();
                 }
                 result
             }
-            hash_map::Entry::Vacant(vac) => f(vac.insert(V::default())),
+            hash_map::Entry::Vacant(vac) => {
+                let v = vac.insert(V::default());
+                let result = value.add_to(v);
+                assert!(!v.is_empty());
+                result
+            }
         }
     }
 }
@@ -95,23 +93,24 @@ impl<K: Ord, V> IsMap<K, V> for BTreeMap<K, V> {
     {
         self.entry(key).or_default()
     }
-    fn on_entry_then_remove_null_or_on_insert_default<R>(
-        &mut self,
-        key: K,
-        f: impl FnOnce(&mut V) -> R,
-    ) -> R
+    fn add<Val: AddToValue<V>>(&mut self, key: K, value: Val) -> ValueChanges
     where
         V: Nullable,
     {
         match self.entry(key) {
             btree_map::Entry::Occupied(mut occ) => {
-                let result = f(occ.get_mut());
+                let result = value.add_to(occ.get_mut());
                 if occ.get().is_empty() {
                     occ.remove();
                 }
                 result
             }
-            btree_map::Entry::Vacant(vac) => f(vac.insert(V::default())),
+            btree_map::Entry::Vacant(vac) => {
+                let v = vac.insert(V::default());
+                let result = value.add_to(v);
+                assert!(!v.is_empty());
+                result
+            }
         }
     }
 }

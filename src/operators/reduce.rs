@@ -17,7 +17,7 @@ pub struct Reduce<K, V, Y, F, M, C> {
     changed_keys_scratch: HashSet<K>,
 }
 
-impl<K, V, Y, F, M, C> Reduce<K, V, Y, F, M, C> {
+impl<K, V, Y, F, M: Default, C> Reduce<K, V, Y, F, M, C> {
     pub(crate) fn new(sub_rel: RelationInner<(K, V), C>, f: F) -> Self {
         Self {
             sub_rel,
