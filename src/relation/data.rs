@@ -1,11 +1,11 @@
 use std::sync::{atomic::AtomicUsize, Arc};
 
 pub(crate) struct RelationData {
-    pub(super) name: Option<String>,
-    pub(super) type_name: &'static str,
-    pub(super) hidden: bool,
-    pub(super) children: Vec<Arc<RelationData>>,
-    pub(super) visit_count: Arc<AtomicUsize>,
+    pub(crate) name: Option<String>,
+    pub(crate) type_name: &'static str,
+    pub(crate) hidden: bool,
+    pub(crate) children: Vec<Arc<RelationData>>,
+    pub(crate) visit_count: Arc<AtomicUsize>,
 }
 impl RelationData {
     pub(crate) fn new(type_name: &'static str, children: Vec<Arc<RelationData>>) -> Self {
@@ -36,7 +36,7 @@ impl RelationData {
         self.on_first_shown(|data| data.type_name = type_name)
     }
 
-    pub(crate) fn hide(&mut self) {
+    pub(super) fn hide(&mut self) {
         self.on_first_shown(|data| data.hidden = true)
     }
 }
