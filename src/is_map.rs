@@ -14,7 +14,7 @@ pub trait IsMap<K, V>: Nullable {
     fn drain(&mut self) -> Self::DrainIter<'_>;
     fn contains_key(&self, key: &K) -> bool;
     fn get(&self, key: &K) -> Option<&V>;
-    fn insert(&mut self, key: K, value: V) -> Option<V>;
+    fn insert_new(&mut self, key: K, value: V);
     fn add<Val: AddToValue<V>>(&mut self, key: K, value: Val) -> ValueChanges
     where
         V: Nullable;
@@ -35,8 +35,9 @@ impl<K: Eq + Hash, V> IsMap<K, V> for HashMap<K, V> {
     fn get(&self, key: &K) -> Option<&V> {
         self.get(key)
     }
-    fn insert(&mut self, key: K, value: V) -> Option<V> {
-        self.insert(key, value)
+    fn insert_new(&mut self, key: K, value: V) {
+        let replaced = self.insert(key, value);
+        assert!(replaced.is_none());
     }
     fn add<Val: AddToValue<V>>(&mut self, key: K, value: Val) -> ValueChanges
     where
@@ -75,8 +76,9 @@ impl<K: Ord, V> IsMap<K, V> for BTreeMap<K, V> {
     fn get(&self, key: &K) -> Option<&V> {
         self.get(key)
     }
-    fn insert(&mut self, key: K, value: V) -> Option<V> {
-        self.insert(key, value)
+    fn insert_new(&mut self, key: K, value: V) {
+        let replaced = self.insert(key, value);
+        assert!(replaced.is_none());
     }
     fn add<Val: AddToValue<V>>(&mut self, key: K, value: Val) -> ValueChanges
     where

@@ -1,10 +1,4 @@
-pub use self::context::{CreationContext, ExecutionContext};
-pub use self::e1map::E1Map;
-pub use self::op::{DynOp, Op};
-pub use self::operators::{input::Input, save::Saved};
-pub use self::output::Output;
-pub use self::relation::Relation;
-pub use self::value_count::ValueCount;
+pub use self::context::CreationContext;
 
 mod add_to_value;
 mod arc_key;
@@ -12,6 +6,7 @@ mod broadcast_channel;
 mod channel;
 mod context;
 mod e1map;
+mod hash_heap;
 mod is_map;
 mod nullable;
 mod op;

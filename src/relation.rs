@@ -13,7 +13,7 @@ use std::{
 
 use crate::{
     context::{CommitId, ContextId},
-    e1map::{E1BTreeMap, E1Map},
+    e1map::{E1HashMaxHeap, E1HashMinHeap, E1Map},
     op::{DynOp, Op},
     operators::{
         antijoin::AntiJoin,
@@ -208,7 +208,7 @@ impl<T: Eq + Hash + Clone, C: Op<T>> Relation<T, C> {
 
     pub fn global_max(self) -> Relation<T, impl Op<T>>
     where
-        T: Ord,
+        T: Copy + Ord,
     {
         self.map_h(|t| ((), t))
             .maxes()
@@ -218,7 +218,7 @@ impl<T: Eq + Hash + Clone, C: Op<T>> Relation<T, C> {
 
     pub fn global_min(self) -> Relation<T, impl Op<T>>
     where
-        T: Ord,
+        T: Copy + Ord,
     {
         self.map_h(|t| ((), t))
             .mins()
@@ -269,11 +269,12 @@ where
 
     pub fn maxes(self) -> Relation<(K, V), impl Op<(K, V)>>
     where
-        V: Ord,
+        V: Copy + Ord,
     {
         Relation::from_op(self, |r| {
-            Reduce::new(r, |_: &K, vals: &E1BTreeMap<V, ValueCount>| {
-                vals.last_key_value().unwrap().0.clone()
+            Reduce::new(r, |_: &K, vals: &E1HashMaxHeap<V, ValueCount>| {
+                let (v, _) = vals.max_key_value().unwrap();
+                v.clone()
             })
         })
         .type_named("maxes")
@@ -281,11 +282,12 @@ where
 
     pub fn mins(self) -> Relation<(K, V), impl Op<(K, V)>>
     where
-        V: Ord,
+        V: Copy + Ord,
     {
         Relation::from_op(self, |r| {
-            Reduce::new(r, |_: &K, vals: &E1BTreeMap<V, ValueCount>| {
-                vals.first_key_value().unwrap().0.clone()
+            Reduce::new(r, |_: &K, vals: &E1HashMinHeap<V, ValueCount>| {
+                let (v, _) = vals.min_key_value().unwrap();
+                v.clone()
             })
         })
         .type_named("mins")

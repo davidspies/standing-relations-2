@@ -1,14 +1,10 @@
-use std::{
-    collections::{BTreeMap, HashMap},
-    hash::Hash,
-    iter::Chain,
-    mem, option,
-};
+use std::{collections::HashMap, hash::Hash, iter::Chain, mem, option};
 
 use derivative::Derivative;
 
 use crate::{
     add_to_value::{AddToValue, ValueChanges},
+    hash_heap::{HashMaxHeap, HashMinHeap},
     is_map::IsMap,
     nullable::Nullable,
 };
@@ -112,10 +108,8 @@ impl<K: Eq, V, M: IsMap<K, V>> E1Map<K, V, M> {
                     }
                     result
                 } else {
-                    let replaced = self
-                        .non_singleton
-                        .insert(k, mem::take(&mut self.singleton_value));
-                    assert!(replaced.is_none());
+                    self.non_singleton
+                        .insert_new(k, mem::take(&mut self.singleton_value));
                     let result = self.non_singleton.add(key, value);
                     assert_eq!(self.non_singleton.len(), 2);
                     result
@@ -141,20 +135,24 @@ impl<K: Eq, V, M: IsMap<K, V>> E1Map<K, V, M> {
     }
 }
 
-pub type E1BTreeMap<K, V> = E1Map<K, V, BTreeMap<K, V>>;
+pub type E1HashMaxHeap<K, V> = E1Map<K, V, HashMaxHeap<K, V>>;
 
-impl<K: Ord, V> E1BTreeMap<K, V> {
-    pub fn first_key_value(&self) -> Option<(&K, &V)> {
+pub type E1HashMinHeap<K, V> = E1Map<K, V, HashMinHeap<K, V>>;
+
+impl<K: Ord + Hash, V> E1HashMaxHeap<K, V> {
+    pub fn max_key_value(&self) -> Option<(&K, &V)> {
         match &self.singleton_key {
             Some(k) => Some((k, &self.singleton_value)),
-            None => self.non_singleton.first_key_value(),
+            None => self.non_singleton.max_key_value(),
         }
     }
+}
 
-    pub fn last_key_value(&self) -> Option<(&K, &V)> {
+impl<K: Ord + Hash, V> E1HashMinHeap<K, V> {
+    pub fn min_key_value(&self) -> Option<(&K, &V)> {
         match &self.singleton_key {
             Some(k) => Some((k, &self.singleton_value)),
-            None => self.non_singleton.last_key_value(),
+            None => self.non_singleton.min_key_value(),
         }
     }
 }
