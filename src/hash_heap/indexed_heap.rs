@@ -1,3 +1,5 @@
+use std::ops::Index;
+
 use derivative::Derivative;
 
 #[derive(Derivative)]
@@ -17,12 +19,8 @@ impl<T, C> IndexedHeap<T, C> {
     }
 }
 
-impl<T: Clone + Ord, C: Comparator> IndexedHeap<T, C> {
-    pub(super) fn insert(
-        &mut self,
-        val: T,
-        changed_indices_scratch: &mut Vec<(T, usize)>,
-    ) -> usize {
+impl<T: Ord, C: Comparator> IndexedHeap<T, C> {
+    pub(super) fn insert(&mut self, val: T, changed_indices_scratch: &mut Vec<usize>) -> usize {
         let mut new_index = self.values.len();
         self.values.push(val);
         while new_index != 0 {
@@ -33,13 +31,13 @@ impl<T: Clone + Ord, C: Comparator> IndexedHeap<T, C> {
             {
                 break;
             }
-            changed_indices_scratch.push((self.values[parent_index].clone(), new_index));
+            changed_indices_scratch.push(new_index);
             self.values.swap(parent_index, new_index);
             new_index = parent_index;
         }
         new_index
     }
-    pub(super) fn remove(&mut self, index: usize, changed_indices_scratch: &mut Vec<(T, usize)>) {
+    pub(super) fn remove(&mut self, index: usize, changed_indices_scratch: &mut Vec<usize>) {
         let last_index = self.values.len() - 1;
         self.values.swap(index, last_index);
         self.values.pop();
@@ -66,11 +64,19 @@ impl<T: Clone + Ord, C: Comparator> IndexedHeap<T, C> {
             {
                 break;
             }
-            changed_indices_scratch.push((self.values[favored_child_index].clone(), current_index));
+            changed_indices_scratch.push(current_index);
             self.values.swap(current_index, favored_child_index);
             current_index = favored_child_index;
         }
-        changed_indices_scratch.push((self.values[current_index].clone(), current_index));
+        changed_indices_scratch.push(current_index);
+    }
+}
+
+impl<T, C> Index<usize> for IndexedHeap<T, C> {
+    type Output = T;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.values[index]
     }
 }
 

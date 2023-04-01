@@ -21,7 +21,7 @@ mod indexed_heap;
 pub struct HashHeap<K, V, C> {
     heap: IndexedHeap<K, C>,
     map: HashMap<K, Entry<V>>,
-    changed_indices_scratch: Vec<(K, usize)>,
+    changed_indices_scratch: Vec<usize>,
 }
 
 pub type HashMaxHeap<K, V> = HashHeap<K, V, Max>;
@@ -91,8 +91,8 @@ impl<K: Clone + Ord + Hash, V, C: Default + Comparator> IsMap<K, V> for HashHeap
         };
         let replaced = self.map.insert(key, entry);
         assert!(replaced.is_none());
-        for (k, i) in self.changed_indices_scratch.drain(..) {
-            self.map.get_mut(&k).unwrap().heap_index = i;
+        for i in self.changed_indices_scratch.drain(..) {
+            self.map.get_mut(&self.heap[i]).unwrap().heap_index = i;
         }
     }
 
@@ -125,8 +125,8 @@ impl<K: Clone + Ord + Hash, V, C: Default + Comparator> IsMap<K, V> for HashHeap
                 result
             }
         };
-        for (k, i) in self.changed_indices_scratch.drain(..) {
-            self.map.get_mut(&k).unwrap().heap_index = i;
+        for i in self.changed_indices_scratch.drain(..) {
+            self.map.get_mut(&self.heap[i]).unwrap().heap_index = i;
         }
         result
     }
