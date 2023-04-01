@@ -58,19 +58,17 @@ impl<T: Clone, C: Op<T>> Op<T> for SavedOp<T, C> {
         "save"
     }
     fn foreach(&mut self, current_id: CommitId, mut f: impl FnMut(T, ValueCount)) {
-        if self.inner.borrow().last_id < current_id {
-            let mut inner = self.inner.borrow_mut();
-            let SavedInner {
-                context_id: _,
-                data: _,
-                sub_rel,
-                sender,
-                last_id,
-            } = &mut *inner;
-            if *last_id < current_id {
-                sub_rel.foreach(current_id, |t, count| sender.send(&(t, count)));
-                *last_id = current_id
-            }
+        let mut inner = self.inner.borrow_mut();
+        let SavedInner {
+            context_id: _,
+            data: _,
+            sub_rel,
+            sender,
+            last_id,
+        } = &mut *inner;
+        if *last_id < current_id {
+            sub_rel.foreach(current_id, |t, count| sender.send(&(t, count)));
+            *last_id = current_id
         }
         self.receiver.try_iter().for_each(|(t, count)| f(t, count))
     }
