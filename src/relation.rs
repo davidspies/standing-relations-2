@@ -110,11 +110,11 @@ impl<T, C: Op<T>> Relation<T, C> {
         Relation::new(self.context_id, self.data, Box::new(self.inner.operator))
     }
 
-    pub fn flat_map<U, F: Fn(T) -> I, I>(self, f: F) -> Relation<U, FlatMap<T, F, C>>
+    pub fn flat_map<U, G: Fn(T) -> I, I>(self, g: G) -> Relation<U, FlatMap<T, G, C>>
     where
         I: IntoIterator<Item = U>,
     {
-        Relation::from_op(self, |r| FlatMap::new(r, f))
+        Relation::from_op(self, |r| FlatMap::new(r, g))
     }
 
     pub fn distinct(self) -> Relation<T, Distinct<T, C>>
@@ -244,14 +244,14 @@ where
         Relation::from_op((self, other), InnerJoin::new)
     }
 
-    pub fn reduce<Y, F: Fn(&K, &E1Map<V, ValueCount>) -> Y>(
+    pub fn reduce<Y, G: Fn(&K, &E1Map<V, ValueCount>) -> Y>(
         self,
-        f: F,
-    ) -> Relation<(K, Y), Reduce<K, V, Y, F, E1Map<V, ValueCount>, C>>
+        g: G,
+    ) -> Relation<(K, Y), Reduce<K, V, Y, G, E1Map<V, ValueCount>, C>>
     where
         Y: Eq + Clone,
     {
-        Relation::from_op(self, |r| Reduce::new(r, f))
+        Relation::from_op(self, |r| Reduce::new(r, g))
     }
 
     pub fn antijoin<CR: Op<K>>(
