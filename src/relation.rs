@@ -208,7 +208,7 @@ impl<T: Eq + Hash + Clone, C: Op<T>> Relation<T, C> {
 
     pub fn global_max(self) -> Relation<T, impl Op<T>>
     where
-        T: Copy + Ord,
+        T: Clone + Ord,
     {
         self.map_h(|t| ((), t))
             .maxes()
@@ -218,7 +218,7 @@ impl<T: Eq + Hash + Clone, C: Op<T>> Relation<T, C> {
 
     pub fn global_min(self) -> Relation<T, impl Op<T>>
     where
-        T: Copy + Ord,
+        T: Clone + Ord,
     {
         self.map_h(|t| ((), t))
             .mins()
@@ -269,7 +269,7 @@ where
 
     pub fn maxes(self) -> Relation<(K, V), impl Op<(K, V)>>
     where
-        V: Copy + Ord,
+        V: Clone + Ord,
     {
         Relation::from_op(self, |r| {
             Reduce::new(r, |_: &K, vals: &E1HashMaxHeap<V, ValueCount>| {
@@ -282,7 +282,7 @@ where
 
     pub fn mins(self) -> Relation<(K, V), impl Op<(K, V)>>
     where
-        V: Copy + Ord,
+        V: Clone + Ord,
     {
         Relation::from_op(self, |r| {
             Reduce::new(r, |_: &K, vals: &E1HashMinHeap<V, ValueCount>| {

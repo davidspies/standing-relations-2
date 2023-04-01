@@ -40,6 +40,12 @@ pub struct CreationContext<'a> {
     relational_graph: HashSet<ArcKey<RelationData>>,
 }
 
+impl<'a> Default for CreationContext<'a> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<'a> CreationContext<'a> {
     pub fn new() -> Self {
         Self {
@@ -124,7 +130,7 @@ impl<'a> CreationContext<'a> {
     fn add_all(&mut self, data: &Arc<RelationData>) {
         if self.relational_graph.insert(ArcKey(data.clone())) {
             for child in data.children.iter() {
-                self.add_all(&child);
+                self.add_all(child);
             }
         }
     }
