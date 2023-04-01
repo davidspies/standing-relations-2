@@ -13,7 +13,9 @@ pub struct AntiJoin<K, V, CL, CR> {
 }
 
 impl<K, V, CL, CR> AntiJoin<K, V, CL, CR> {
-    pub(crate) fn new((left_rel, right_rel): (RelationInner<(K, V), CL>, RelationInner<K, CR>)) -> Self {
+    pub(crate) fn new(
+        (left_rel, right_rel): (RelationInner<(K, V), CL>, RelationInner<K, CR>),
+    ) -> Self {
         Self {
             left_rel,
             right_rel,
@@ -33,7 +35,7 @@ where
     fn type_name(&self) -> &'static str {
         "anti_join"
     }
-    fn foreach(&mut self, current_id: CommitId, mut f: impl FnMut((K, V), ValueCount)) {
+    fn foreach<F: FnMut((K, V), ValueCount)>(&mut self, current_id: CommitId, mut f: F) {
         self.right_rel.foreach(current_id, |k, count| {
             match self.right_values.add(k.clone(), count) {
                 ValueChanges {

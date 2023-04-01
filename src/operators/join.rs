@@ -37,7 +37,7 @@ where
     fn type_name(&self) -> &'static str {
         "join"
     }
-    fn foreach(&mut self, current_id: CommitId, mut f: impl FnMut((K, VL, VR), ValueCount)) {
+    fn foreach<F: FnMut((K, VL, VR), ValueCount)>(&mut self, current_id: CommitId, mut f: F) {
         self.left_rel.foreach(current_id, |(k, vl), lcount| {
             for (vr, &rcount) in self.right_values.get(&k).into_iter().flatten() {
                 f((k.clone(), vl.clone(), vr.clone()), lcount * rcount)

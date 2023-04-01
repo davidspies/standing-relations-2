@@ -25,7 +25,7 @@ impl<T: Clone + Eq + Hash, C: Op<T>> Op<T> for Distinct<T, C> {
     fn type_name(&self) -> &'static str {
         "distinct"
     }
-    fn foreach(&mut self, current_id: CommitId, mut f: impl FnMut(T, ValueCount)) {
+    fn foreach<F: FnMut(T, ValueCount)>(&mut self, current_id: CommitId, mut f: F) {
         self.sub_rel.foreach(current_id, |value, count| {
             match self.current_counts.add(value.clone(), count) {
                 ValueChanges {

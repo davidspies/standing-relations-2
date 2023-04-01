@@ -42,7 +42,7 @@ where
     fn type_name(&self) -> &'static str {
         "reduce"
     }
-    fn foreach(&mut self, current_id: CommitId, mut f: impl FnMut((K, Y), ValueCount)) {
+    fn foreach<F: FnMut((K, Y), ValueCount)>(&mut self, current_id: CommitId, mut f: F) {
         self.sub_rel.foreach(current_id, |(k, v), count| {
             self.aggregated_values.add(k.clone(), (v, count));
             self.changed_keys_scratch.insert(k);

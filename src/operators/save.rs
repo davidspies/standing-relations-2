@@ -57,7 +57,7 @@ impl<T: Clone, C: Op<T>> Op<T> for SavedOp<T, C> {
     fn type_name(&self) -> &'static str {
         "save"
     }
-    fn foreach(&mut self, current_id: CommitId, mut f: impl FnMut(T, ValueCount)) {
+    fn foreach<F: FnMut(T, ValueCount)>(&mut self, current_id: CommitId, mut f: F) {
         let mut inner = self.inner.borrow_mut();
         let SavedInner {
             context_id: _,
