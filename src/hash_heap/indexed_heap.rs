@@ -47,15 +47,16 @@ impl<T: Ord, C: Comparator> IndexedHeap<T, C> {
         let mut current_index = index;
         loop {
             let (left_child_index, right_child_index) = children(current_index);
-            let mut favored_child_index = left_child_index;
-            if right_child_index < self.values.len() {
-                if self.comparator.favors(
+            let favored_child_index = if right_child_index < self.values.len()
+                && self.comparator.favors(
                     &self.values[right_child_index],
                     &self.values[left_child_index],
                 ) {
-                    favored_child_index = right_child_index;
-                }
-            }
+                right_child_index
+            } else {
+                left_child_index
+            };
+            changed_indices_scratch.push(current_index);
             if favored_child_index >= self.values.len()
                 || !self.comparator.favors(
                     &self.values[favored_child_index],
@@ -64,11 +65,9 @@ impl<T: Ord, C: Comparator> IndexedHeap<T, C> {
             {
                 break;
             }
-            changed_indices_scratch.push(current_index);
             self.values.swap(current_index, favored_child_index);
             current_index = favored_child_index;
         }
-        changed_indices_scratch.push(current_index);
     }
 }
 
