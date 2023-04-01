@@ -1,5 +1,4 @@
 use std::{
-    cmp::Reverse,
     collections::{hash_map, HashMap},
     hash::Hash,
     iter,
@@ -13,59 +12,56 @@ use crate::{
     nullable::Nullable,
 };
 
-use self::indexed_heap::IndexedHeap;
+use self::indexed_heap::{Comparator, IndexedHeap, Max, Min};
 
 mod indexed_heap;
 
 #[derive(Derivative)]
-#[derivative(Default(bound = ""))]
-pub struct HashHeap<K, V> {
-    heap: IndexedHeap<K>,
+#[derivative(Default(bound = "C: Default"))]
+pub struct HashHeap<K, V, C> {
+    heap: IndexedHeap<K, C>,
     map: HashMap<K, Entry<V>>,
     changed_indices_scratch: Vec<(K, usize)>,
 }
 
-pub type HashMaxHeap<K, V> = HashHeap<K, V>;
+pub type HashMaxHeap<K, V> = HashHeap<K, V, Max>;
 
-#[derive(Derivative)]
-#[derivative(Default(bound = ""))]
-pub struct HashMinHeap<K, V>(HashHeap<Reverse<K>, V>);
+pub type HashMinHeap<K, V> = HashHeap<K, V, Min>;
 
 pub struct Entry<V> {
     value: V,
     heap_index: usize,
 }
 
-impl<K: Eq + Hash, V> HashHeap<K, V> {
-    pub fn max_key_value(&self) -> Option<(&K, &V)> {
+impl<K: Eq + Hash, V, C> HashHeap<K, V, C> {
+    pub fn favored_key_value(&self) -> Option<(&K, &V)> {
         let key = self.heap.peek()?;
         Some((key, &self.map.get(key).unwrap().value))
     }
 }
 
+impl<K: Eq + Hash, V> HashMaxHeap<K, V> {
+    pub fn max_key_value(&self) -> Option<(&K, &V)> {
+        self.favored_key_value()
+    }
+}
+
 impl<K: Eq + Hash, V> HashMinHeap<K, V> {
     pub fn min_key_value(&self) -> Option<(&K, &V)> {
-        let key = self.0.heap.peek()?;
-        Some((&key.0, &self.0.map.get(&key).unwrap().value))
+        self.favored_key_value()
     }
 }
 
-impl<K, V> Nullable for HashHeap<K, V> {
+impl<K, V, C: Default> Nullable for HashHeap<K, V, C> {
     fn is_empty(&self) -> bool {
         self.map.is_empty()
-    }
-}
-
-impl<K, V> Nullable for HashMinHeap<K, V> {
-    fn is_empty(&self) -> bool {
-        self.0.is_empty()
     }
 }
 
 pub type DrainIter<'a, K, V> =
     iter::Map<hash_map::Drain<'a, K, Entry<V>>, fn((K, Entry<V>)) -> (K, V)>;
 
-impl<K: Copy + Ord + Hash, V> IsMap<K, V> for HashHeap<K, V> {
+impl<K: Clone + Ord + Hash, V, C: Default + Comparator> IsMap<K, V> for HashHeap<K, V, C> {
     type DrainIter<'a> = DrainIter<'a, K, V> where Self: 'a;
 
     fn len(&self) -> usize {
@@ -86,7 +82,9 @@ impl<K: Copy + Ord + Hash, V> IsMap<K, V> for HashHeap<K, V> {
     }
 
     fn insert_new(&mut self, key: K, value: V) {
-        let new_index = self.heap.insert(key, &mut self.changed_indices_scratch);
+        let new_index = self
+            .heap
+            .insert(key.clone(), &mut self.changed_indices_scratch);
         let entry = Entry {
             value,
             heap_index: new_index,
@@ -115,7 +113,7 @@ impl<K: Copy + Ord + Hash, V> IsMap<K, V> for HashHeap<K, V> {
             hash_map::Entry::Vacant(vac) => {
                 let new_index = self
                     .heap
-                    .insert(*vac.key(), &mut self.changed_indices_scratch);
+                    .insert(vac.key().clone(), &mut self.changed_indices_scratch);
                 let mut v = V::default();
                 let result = value.add_to(&mut v);
                 assert!(!v.is_empty());
@@ -131,36 +129,5 @@ impl<K: Copy + Ord + Hash, V> IsMap<K, V> for HashHeap<K, V> {
             self.map.get_mut(&k).unwrap().heap_index = i;
         }
         result
-    }
-}
-
-impl<K: Copy + Ord + Hash, V> IsMap<K, V> for HashMinHeap<K, V> {
-    type DrainIter<'a> = iter::Map<DrainIter<'a, Reverse<K>, V>, fn((Reverse<K>, V)) -> (K, V)> where Self: 'a;
-
-    fn len(&self) -> usize {
-        self.0.len()
-    }
-
-    fn drain(&mut self) -> Self::DrainIter<'_> {
-        self.0.drain().map(|(key, value)| (key.0, value))
-    }
-
-    fn contains_key(&self, key: &K) -> bool {
-        self.0.contains_key(&Reverse(*key))
-    }
-
-    fn get(&self, key: &K) -> Option<&V> {
-        self.0.get(&Reverse(*key))
-    }
-
-    fn insert_new(&mut self, key: K, value: V) {
-        self.0.insert_new(Reverse(key), value)
-    }
-
-    fn add<Val: AddToValue<V>>(&mut self, key: K, value: Val) -> ValueChanges
-    where
-        V: Nullable,
-    {
-        self.0.add(Reverse(key), value)
     }
 }
