@@ -70,6 +70,8 @@ impl<T: Clone, C: Op<T>> Op<T> for SavedOp<T, C> {
             sub_rel.foreach(current_id, |t, count| sender.send(&(t, count)));
             *last_id = current_id
         }
-        self.receiver.try_iter().for_each(|(t, count)| f(t, count))
+        while let Some((t, count)) = self.receiver.try_recv() {
+            f(t, count)
+        }
     }
 }

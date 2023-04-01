@@ -67,6 +67,8 @@ impl<T, L, R, C: Op<(L, R)>> Op<T> for SplitOp<T, L, R, C> {
             });
             *last_id = current_id
         }
-        self.receiver.try_iter().for_each(|(t, count)| f(t, count))
+        while let Some((t, count)) = self.receiver.try_recv() {
+            f(t, count)
+        }
     }
 }
