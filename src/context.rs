@@ -1,4 +1,10 @@
-use std::{cell::Cell, collections::HashSet, hash::Hash, rc::Rc, sync::Arc};
+use std::cell::Cell;
+use std::collections::HashSet;
+#[cfg(feature = "redis")]
+use std::fmt::Debug;
+use std::hash::Hash;
+use std::rc::Rc;
+use std::sync::Arc;
 
 use index_list::IndexList;
 use uuid::Uuid;
@@ -7,15 +13,14 @@ use crate::{
     arc_key::ArcKey,
     channel,
     op::Op,
-    operators::{
-        input::{Input, InputOp},
-        save::Saved,
-    },
+    operators::input::{Input, InputOp},
     output::Output,
     relation::{data::RelationData, Relation},
     value_count::ValueCount,
 };
 
+#[cfg(feature = "redis")]
+use self::pipes::redis::RedisPipe;
 use self::pipes::{
     feedback::FeedbackPipe, interrupt::Interrupt, tracked::TrackedInputPipe,
     untracked::UntrackedInputPipe, PipeT, ProcessResult,
@@ -28,7 +33,7 @@ mod pipes;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) struct ContextId(Uuid);
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(PartialEq, Eq, Hash, Clone, Copy, Debug, Default, PartialOrd, Ord)]
 pub struct CommitId(usize);
 
 pub struct CreationContext<'a> {
@@ -37,6 +42,8 @@ pub struct CreationContext<'a> {
     input_pipes: Vec<Box<dyn PipeT + 'a>>,
     feedback_pipes: IndexList<Box<dyn PipeT + 'a>>,
     relational_graph: HashSet<ArcKey<RelationData>>,
+    #[cfg(feature = "redis")]
+    redis: Option<redis::Client>,
 }
 
 impl<'a> Default for CreationContext<'a> {
@@ -53,6 +60,15 @@ impl<'a> CreationContext<'a> {
             input_pipes: Vec::new(),
             feedback_pipes: IndexList::new(),
             relational_graph: HashSet::new(),
+            #[cfg(feature = "redis")]
+            redis: None,
+        }
+    }
+    #[cfg(feature = "redis")]
+    pub fn with_redis(redis: redis::Client) -> Self {
+        Self {
+            redis: Some(redis),
+            ..Self::new()
         }
     }
     pub fn input<T: Eq + Hash + Clone + 'a>(&mut self) -> (Input<T>, Relation<T, InputOp<T>>) {
@@ -96,20 +112,24 @@ impl<'a> CreationContext<'a> {
         self.feedback_pipes
             .insert_last(Box::new(Interrupt::new(id, relation.inner)));
     }
-    pub fn first_occurrences<K: Eq + Hash + Clone + 'a, V: Eq + Hash + Clone + 'a>(
-        &mut self,
-        relation: Relation<(K, V), impl Op<(K, V)> + 'a>,
-    ) -> Saved<(K, V), InputOp<(K, V)>> {
-        assert_eq!(self.id, relation.context_id);
-        let (input, input_rel) = self.input();
-        let input_rel = input_rel.save();
-        self.feedback(relation.antijoin(input_rel.get().fsts()), input);
-        input_rel
-    }
     pub fn output<T, C>(&mut self, relation: Relation<T, C>) -> Output<T, C> {
         assert_eq!(self.id, relation.context_id);
         self.add_all(&Arc::new(relation.data));
         Output::new(relation.inner, self.commit_id.clone())
+    }
+    #[cfg(feature = "redis")]
+    pub fn send_to_redis<T, C>(&mut self, name: impl ToString, relation: Relation<T, C>)
+    where
+        T: Clone + Eq + Hash + Debug + 'a,
+        C: Op<T> + 'a,
+    {
+        assert_eq!(self.id, relation.context_id);
+        self.add_all(&Arc::new(relation.data));
+        self.feedback_pipes.insert_last(Box::new(RedisPipe::new(
+            name.to_string(),
+            relation.inner,
+            self.redis.clone().unwrap(),
+        )));
     }
     pub fn begin(self) -> ExecutionContext<'a> {
         let Self {
@@ -117,7 +137,7 @@ impl<'a> CreationContext<'a> {
             commit_id,
             input_pipes,
             feedback_pipes,
-            relational_graph: _,
+            ..
         } = self;
         ExecutionContext {
             commit_id,
@@ -185,12 +205,18 @@ impl ExecutionContext<'_> {
         let result = f(self);
 
         self.input_pipes
-            .retain_mut(|input| input.pop_frame().is_ok());
+            .retain_mut(|input| input.pop_frame(self.commit_id.get()).is_ok());
 
         let mut i = self.feedback_pipes.first_index();
         while i.is_some() {
             let next_i = self.feedback_pipes.next_index(i);
-            if self.feedback_pipes.get_mut(i).unwrap().pop_frame().is_err() {
+            if self
+                .feedback_pipes
+                .get_mut(i)
+                .unwrap()
+                .pop_frame(self.commit_id.get())
+                .is_err()
+            {
                 self.feedback_pipes.remove(i);
             }
             i = next_i;

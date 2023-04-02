@@ -1,10 +1,11 @@
-use std::{collections::HashSet, hash::Hash};
-
-use generic_map::rollover_map::RolloverMap;
+use std::{
+    collections::{HashMap, HashSet},
+    hash::Hash,
+};
 
 use crate::{
-    generic_map::AddMap,
     context::{CommitId, Dropped},
+    generic_map::AddMap,
     op::Op,
     operators::input::Input,
     relation::RelationInner,
@@ -18,8 +19,8 @@ pub(crate) struct FeedbackPipe<T, C> {
     seen: HashSet<T>,
     frame_changes: Vec<HashSet<T>>,
     input: Input<T>,
-    tracked_map: RolloverMap<T, ValueCount>,
-    scratch_map: RolloverMap<T, ValueCount>,
+    tracked_map: HashMap<T, ValueCount>,
+    scratch_map: HashMap<T, ValueCount>,
 }
 
 impl<T, C> FeedbackPipe<T, C> {
@@ -29,8 +30,8 @@ impl<T, C> FeedbackPipe<T, C> {
             seen: HashSet::new(),
             frame_changes: Vec::new(),
             input,
-            tracked_map: RolloverMap::new(),
-            scratch_map: RolloverMap::new(),
+            tracked_map: HashMap::new(),
+            scratch_map: HashMap::new(),
         }
     }
 }
@@ -63,7 +64,7 @@ impl<T: Eq + Hash + Clone, C: Op<T>> PipeT for FeedbackPipe<T, C> {
     fn push_frame(&mut self) {
         self.frame_changes.push(HashSet::new());
     }
-    fn pop_frame(&mut self) -> Result<(), Dropped> {
+    fn pop_frame(&mut self, _commit_id: CommitId) -> Result<(), Dropped> {
         let frame = self.frame_changes.pop().unwrap();
         for elem in frame {
             self.seen.remove(&elem);

@@ -1,6 +1,4 @@
-use std::hash::Hash;
-
-use generic_map::rollover_map::RolloverMap;
+use std::{collections::HashMap, hash::Hash};
 
 use crate::{
     channel,
@@ -14,7 +12,7 @@ use super::{PipeT, ProcessResult};
 pub(crate) struct TrackedInputPipe<T> {
     receiver: channel::Receiver<(T, ValueCount)>,
     sender: channel::Sender<(T, ValueCount)>,
-    frame_changes: Vec<RolloverMap<T, ValueCount>>,
+    frame_changes: Vec<HashMap<T, ValueCount>>,
 }
 impl<T> TrackedInputPipe<T> {
     pub(crate) fn new(
@@ -44,11 +42,10 @@ impl<T: Eq + Hash + Clone> PipeT for TrackedInputPipe<T> {
         Ok(result)
     }
     fn push_frame(&mut self) {
-        self.frame_changes.push(RolloverMap::new());
+        self.frame_changes.push(HashMap::new());
     }
-    fn pop_frame(&mut self) -> Result<(), Dropped> {
-        let frame = self.frame_changes.pop().unwrap();
-        for (value, value_count) in frame {
+    fn pop_frame(&mut self, _commit_id: CommitId) -> Result<(), Dropped> {
+        for (value, value_count) in self.frame_changes.pop().unwrap() {
             if self.sender.send((value, -value_count)).is_err() {
                 return Err(Dropped);
             }

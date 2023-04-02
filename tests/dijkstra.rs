@@ -2,7 +2,7 @@ use std::{fmt::Debug, hash::Hash};
 
 use standing_relations_2::{CreationContext, SingletonMap};
 
-fn dijkstra<Node: Debug + Eq + Hash + Clone>(
+fn dijkstra<Node: Debug + Ord + Hash + Clone>(
     start: Node,
     end: Node,
     edge_weights: impl IntoIterator<Item = (Node, Node, usize)>,
@@ -35,6 +35,7 @@ fn dijkstra<Node: Debug + Eq + Hash + Clone>(
         .get()
         .join(edges_rel.map(|(from, to, dist)| (from, (to, dist))))
         .map(|(_, prev_dist, (to, edge_dist))| (to, prev_dist + edge_dist))
+        .collect()
         .antijoin(distances.get().fsts())
         .named("next_distances")
         .collect();
@@ -64,7 +65,12 @@ fn dijkstra<Node: Debug + Eq + Hash + Clone>(
 
     match context.commit() {
         Ok(()) => None,
-        Err(0) => Some(*end_distance_output.get().get_singleton().unwrap().0),
+        Err(0) => {
+            let m = end_distance_output.get();
+            let (&k, v) = m.get_singleton().unwrap();
+            eprintln!("{:?}: {:?}", k, v);
+            Some(k)
+        }
         Err(_) => unreachable!(),
     }
 }

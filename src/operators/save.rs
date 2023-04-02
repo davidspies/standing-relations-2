@@ -1,4 +1,4 @@
-use std::{cell::RefCell, rc::Rc, sync::Arc};
+use std::{cell::RefCell, hash::Hash, rc::Rc, sync::Arc};
 
 use crate::{
     broadcast_channel::{Receiver, Sender},
@@ -50,6 +50,21 @@ impl<T: Clone, C: Op<T>> Saved<T, C> {
             operator,
         )
         .hidden()
+    }
+
+    pub fn set_minus(&self, other: Relation<T, impl Op<T>>) -> Relation<T, impl Op<T>>
+    where
+        T: Clone + Eq + Hash,
+    {
+        self.get()
+            .minus(self.get().intersection(other.distinct().hidden()))
+    }
+}
+
+impl<K: Clone + Eq + Hash, V: Clone + Eq + Hash, C: Op<(K, V)>> Saved<(K, V), C> {
+    pub fn antijoin<CR: Op<K>>(&self, other: Relation<K, CR>) -> Relation<(K, V), impl Op<(K, V)>> {
+        self.get()
+            .minus(self.get().semijoin(other.distinct().hidden()))
     }
 }
 

@@ -1,11 +1,9 @@
-use std::{
-    hash::Hash,
-    sync::atomic::{self, AtomicUsize},
+use std::{collections::HashMap, hash::Hash};
+
+use crate::{
+    broadcast_channel, context::CommitId, entry::Entry, generic_map::AddMap,
+    relation::RelationInfo, value_count::ValueCount,
 };
-
-use generic_map::rollover_map::RolloverMap;
-
-use crate::{generic_map::AddMap, broadcast_channel, context::CommitId, value_count::ValueCount};
 
 pub trait Op<T> {
     fn type_name(&self) -> &'static str;
@@ -13,27 +11,38 @@ pub trait Op<T> {
     fn dump_to_map(
         &mut self,
         current_id: CommitId,
-        visit_count: &AtomicUsize,
-        map: &mut RolloverMap<T, ValueCount>,
+        info: &mut RelationInfo,
+        map: &mut HashMap<T, ValueCount>,
     ) where
         T: Eq + Hash,
     {
         self.foreach(current_id, |x, v| {
             map.add((x, v));
-            visit_count.fetch_add(1, atomic::Ordering::Relaxed);
+            info.visit()
+        })
+    }
+    fn dump_to_vec(
+        &mut self,
+        current_id: CommitId,
+        info: &mut RelationInfo,
+        vec: &mut Vec<Entry<T>>,
+    ) {
+        self.foreach(current_id, |x, v| {
+            vec.push(Entry::new(x, v));
+            info.visit()
         })
     }
     fn send_to_broadcast(
         &mut self,
         current_id: CommitId,
-        visit_count: &AtomicUsize,
+        info: &mut RelationInfo,
         broadcast: &mut broadcast_channel::Sender<(T, ValueCount)>,
     ) where
         T: Clone,
     {
         self.foreach(current_id, |x, v| {
             broadcast.send(&(x.clone(), v));
-            visit_count.fetch_add(1, atomic::Ordering::Relaxed);
+            info.visit()
         })
     }
 }
@@ -45,6 +54,34 @@ impl<T, C: Op<T> + ?Sized> Op<T> for Box<C> {
     fn foreach<F: FnMut(T, ValueCount)>(&mut self, current_id: CommitId, f: F) {
         self.as_mut().foreach(current_id, f)
     }
+    fn dump_to_map(
+        &mut self,
+        current_id: CommitId,
+        info: &mut RelationInfo,
+        map: &mut HashMap<T, ValueCount>,
+    ) where
+        T: Eq + Hash,
+    {
+        self.as_mut().dump_to_map(current_id, info, map)
+    }
+    fn dump_to_vec(
+        &mut self,
+        current_id: CommitId,
+        info: &mut RelationInfo,
+        vec: &mut Vec<Entry<T>>,
+    ) {
+        self.as_mut().dump_to_vec(current_id, info, vec)
+    }
+    fn send_to_broadcast(
+        &mut self,
+        current_id: CommitId,
+        info: &mut RelationInfo,
+        broadcast: &mut broadcast_channel::Sender<(T, ValueCount)>,
+    ) where
+        T: Clone,
+    {
+        self.as_mut().send_to_broadcast(current_id, info, broadcast)
+    }
 }
 
 pub trait DynOp<T> {
@@ -53,14 +90,20 @@ pub trait DynOp<T> {
     fn dump_to_map(
         &mut self,
         current_id: CommitId,
-        visit_count: &AtomicUsize,
-        map: &mut RolloverMap<T, ValueCount>,
+        info: &mut RelationInfo,
+        map: &mut HashMap<T, ValueCount>,
     ) where
         T: Eq + Hash;
+    fn dump_to_vec(
+        &mut self,
+        current_id: CommitId,
+        info: &mut RelationInfo,
+        vec: &mut Vec<Entry<T>>,
+    );
     fn send_to_broadcast(
         &mut self,
         current_id: CommitId,
-        visit_count: &AtomicUsize,
+        info: &mut RelationInfo,
         broadcast: &mut broadcast_channel::Sender<(T, ValueCount)>,
     ) where
         T: Clone;
@@ -76,22 +119,30 @@ impl<T, C: Op<T>> DynOp<T> for C {
     fn dump_to_map(
         &mut self,
         current_id: CommitId,
-        visit_count: &AtomicUsize,
-        map: &mut RolloverMap<T, ValueCount>,
+        info: &mut RelationInfo,
+        map: &mut HashMap<T, ValueCount>,
     ) where
         T: Eq + Hash,
     {
-        Op::dump_to_map(self, current_id, visit_count, map)
+        Op::dump_to_map(self, current_id, info, map)
+    }
+    fn dump_to_vec(
+        &mut self,
+        current_id: CommitId,
+        info: &mut RelationInfo,
+        vec: &mut Vec<Entry<T>>,
+    ) {
+        Op::dump_to_vec(self, current_id, info, vec)
     }
     fn send_to_broadcast(
         &mut self,
         current_id: CommitId,
-        visit_count: &AtomicUsize,
+        info: &mut RelationInfo,
         broadcast: &mut broadcast_channel::Sender<(T, ValueCount)>,
     ) where
         T: Clone,
     {
-        Op::send_to_broadcast(self, current_id, visit_count, broadcast)
+        Op::send_to_broadcast(self, current_id, info, broadcast)
     }
 }
 
@@ -105,21 +156,29 @@ impl<T> Op<T> for dyn DynOp<T> + '_ {
     fn dump_to_map(
         &mut self,
         current_id: CommitId,
-        visit_count: &AtomicUsize,
-        map: &mut RolloverMap<T, ValueCount>,
+        info: &mut RelationInfo,
+        map: &mut HashMap<T, ValueCount>,
     ) where
         T: Eq + Hash,
     {
-        DynOp::dump_to_map(self, current_id, visit_count, map)
+        DynOp::dump_to_map(self, current_id, info, map)
+    }
+    fn dump_to_vec(
+        &mut self,
+        current_id: CommitId,
+        info: &mut RelationInfo,
+        vec: &mut Vec<Entry<T>>,
+    ) {
+        DynOp::dump_to_vec(self, current_id, info, vec)
     }
     fn send_to_broadcast(
         &mut self,
         current_id: CommitId,
-        visit_count: &AtomicUsize,
+        info: &mut RelationInfo,
         broadcast: &mut broadcast_channel::Sender<(T, ValueCount)>,
     ) where
         T: Clone,
     {
-        DynOp::send_to_broadcast(self, current_id, visit_count, broadcast)
+        DynOp::send_to_broadcast(self, current_id, info, broadcast)
     }
 }

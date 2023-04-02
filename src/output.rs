@@ -1,10 +1,9 @@
 use std::{
     cell::{Cell, Ref, RefCell},
+    collections::HashMap,
     hash::Hash,
     rc::Rc,
 };
-
-use generic_map::rollover_map::RolloverMap;
 
 use crate::{
     context::CommitId,
@@ -16,7 +15,7 @@ use crate::{
 
 struct OutputInner<T, C> {
     relation: RelationInner<T, C>,
-    values: RolloverMap<T, ValueCount>,
+    values: HashMap<T, ValueCount>,
 }
 
 impl<T: Eq + Hash, C: Op<T>> OutputInner<T, C> {
@@ -37,13 +36,13 @@ impl<T, C> Output<T, C> {
         Output {
             inner: RefCell::new(OutputInner {
                 relation,
-                values: RolloverMap::new(),
+                values: HashMap::new(),
             }),
             commit_id,
         }
     }
 
-    pub fn get(&self) -> Ref<RolloverMap<T, ValueCount>>
+    pub fn get(&self) -> Ref<HashMap<T, ValueCount>>
     where
         T: Eq + Hash,
         C: Op<T>,

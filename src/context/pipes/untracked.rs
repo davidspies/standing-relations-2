@@ -31,7 +31,7 @@ impl<T> PipeT for UntrackedInputPipe<T> {
         Ok(result)
     }
     fn push_frame(&mut self) {}
-    fn pop_frame(&mut self) -> Result<(), Dropped> {
+    fn pop_frame(&mut self, _commit_id: CommitId) -> Result<(), Dropped> {
         Ok(())
     }
 }

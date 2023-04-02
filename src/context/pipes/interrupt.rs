@@ -1,6 +1,4 @@
-use std::hash::Hash;
-
-use generic_map::rollover_map::RolloverMap;
+use std::{collections::HashMap, hash::Hash};
 
 use crate::{
     context::{CommitId, Dropped},
@@ -16,7 +14,7 @@ pub type InterruptId = usize;
 pub struct Interrupt<T, C> {
     relation: RelationInner<T, C>,
     interrupt_id: InterruptId,
-    values: RolloverMap<T, ValueCount>,
+    values: HashMap<T, ValueCount>,
 }
 
 impl<T, C> Interrupt<T, C> {
@@ -24,7 +22,7 @@ impl<T, C> Interrupt<T, C> {
         Self {
             relation,
             interrupt_id,
-            values: RolloverMap::new(),
+            values: HashMap::new(),
         }
     }
 }
@@ -39,7 +37,7 @@ impl<T: Eq + Hash, C: Op<T>> PipeT for Interrupt<T, C> {
         }
     }
     fn push_frame(&mut self) {}
-    fn pop_frame(&mut self) -> Result<(), Dropped> {
+    fn pop_frame(&mut self, _commit_id: CommitId) -> Result<(), Dropped> {
         Ok(())
     }
 }

@@ -7,7 +7,7 @@ use std::{
 use generic_map::{GenericMap, RolloverMap};
 
 use crate::{
-    context::CommitId, generic_map::AddMap, op::Op, relation::RelationInner,
+    context::CommitId, entry::Entry, generic_map::AddMap, op::Op, relation::RelationInner,
     value_count::ValueCount,
 };
 
@@ -16,17 +16,19 @@ pub struct Reduce<K, V, Y, G, M, C> {
     g: G,
     aggregated_values: RolloverMap<K, M>,
     outputs: HashMap<K, Y>,
+    encountered_changes_scratch: Vec<Entry<(K, V)>>,
     changed_keys_scratch: HashSet<K>,
 }
 
-impl<K, V, Y, G, M: Default, C> Reduce<K, V, Y, G, M, C> {
+impl<K, V, Y, G: Fn(&K, &M) -> Y, M: Default, C> Reduce<K, V, Y, G, M, C> {
     pub(crate) fn new(sub_rel: RelationInner<(K, V), C>, g: G) -> Self {
         Self {
             sub_rel,
             g,
-            aggregated_values: RolloverMap::default(),
-            outputs: HashMap::default(),
-            changed_keys_scratch: HashSet::default(),
+            aggregated_values: RolloverMap::new(),
+            outputs: HashMap::new(),
+            encountered_changes_scratch: Vec::new(),
+            changed_keys_scratch: HashSet::new(),
         }
     }
 }
@@ -44,10 +46,16 @@ where
         "reduce"
     }
     fn foreach<F: FnMut((K, Y), ValueCount)>(&mut self, current_id: CommitId, mut f: F) {
-        self.sub_rel.foreach(current_id, |(k, v), count| {
-            self.aggregated_values.add((k.clone(), (v, count)));
-            self.changed_keys_scratch.insert(k);
-        });
+        self.sub_rel
+            .dump_to_vec(current_id, &mut self.encountered_changes_scratch);
+        for e in self.encountered_changes_scratch.drain(..) {
+            let Entry {
+                value: (k, v),
+                value_count,
+            } = e;
+            self.changed_keys_scratch.insert(k.clone());
+            self.aggregated_values.add((k, (v, value_count)));
+        }
         for k in self.changed_keys_scratch.drain() {
             match self.aggregated_values.get(&k) {
                 None => {

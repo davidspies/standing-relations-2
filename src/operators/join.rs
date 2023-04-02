@@ -1,19 +1,19 @@
 #![allow(clippy::type_complexity)]
 
-use std::hash::Hash;
+use std::{collections::HashMap, hash::Hash};
 
 use generic_map::rollover_map::RolloverMap;
 
 use crate::{
-    generic_map::AddMap, context::CommitId, op::Op, relation::RelationInner,
+    context::CommitId, generic_map::AddMap, op::Op, relation::RelationInner,
     value_count::ValueCount,
 };
 
 pub struct InnerJoin<K, VL, CL, VR, CR> {
     left_rel: RelationInner<(K, VL), CL>,
     right_rel: RelationInner<(K, VR), CR>,
-    left_values: RolloverMap<K, RolloverMap<VL, ValueCount>>,
-    right_values: RolloverMap<K, RolloverMap<VR, ValueCount>>,
+    left_values: HashMap<K, RolloverMap<VL, ValueCount, 2>>,
+    right_values: HashMap<K, RolloverMap<VR, ValueCount, 2>>,
 }
 
 impl<K, VL, CL, VR, CR> InnerJoin<K, VL, CL, VR, CR> {
@@ -23,8 +23,8 @@ impl<K, VL, CL, VR, CR> InnerJoin<K, VL, CL, VR, CR> {
         Self {
             left_rel,
             right_rel,
-            left_values: RolloverMap::default(),
-            right_values: RolloverMap::default(),
+            left_values: HashMap::default(),
+            right_values: HashMap::default(),
         }
     }
 }

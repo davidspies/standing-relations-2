@@ -12,6 +12,7 @@ mod arc_key;
 mod broadcast_channel;
 mod channel;
 mod context;
+mod entry;
 mod generic_map;
 mod nullable;
 mod op;

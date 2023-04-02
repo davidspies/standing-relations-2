@@ -16,7 +16,7 @@ impl<T, CL: Op<T>, CR: Op<T>> Op<T> for Concat<T, CL, CR> {
         "concat"
     }
     fn foreach<F: FnMut(T, ValueCount)>(&mut self, current_id: CommitId, mut f: F) {
-        self.left.foreach(current_id, &mut f);
-        self.right.foreach(current_id, f);
+        self.left.foreach(current_id, |x, v| f(x, v));
+        self.right.foreach(current_id, |x, v| f(x, v));
     }
 }

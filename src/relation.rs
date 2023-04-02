@@ -1,6 +1,7 @@
 #![allow(clippy::type_complexity)]
 
 use std::{
+    collections::HashMap,
     convert::identity,
     hash::Hash,
     iter,
@@ -11,18 +12,22 @@ use std::{
     },
 };
 
-use generic_map::{rollover_map::RolloverMap, HashedMaxHeap, HashedMinHeap};
+use generic_map::{
+    clear::Clear,
+    rollover_map::{RolloverHashedMaxHeap, RolloverHashedMinHeap, RolloverMap},
+    GenericMap,
+};
 
 use crate::{
     broadcast_channel,
     context::{CommitId, ContextId},
+    entry::Entry,
     generic_map::SingletonMap,
+    nullable::Nullable,
     op::{DynOp, Op},
     operators::{
-        antijoin::AntiJoin,
         concat::Concat,
         consolidate::Consolidate,
-        distinct::Distinct,
         flat_map::FlatMap,
         join::InnerJoin,
         negate::Negate,
@@ -45,18 +50,25 @@ pub struct Relation<T, C = Box<dyn DynOp<T>>> {
     pub(crate) inner: RelationInner<T, C>,
 }
 
+pub struct RelationInfo {
+    visit_count: Arc<AtomicUsize>,
+}
+
+impl RelationInfo {
+    pub(crate) fn visit(&mut self) {
+        self.visit_count.fetch_add(1, atomic::Ordering::Relaxed);
+    }
+}
+
 pub(crate) struct RelationInner<T, C> {
     phantom: PhantomData<T>,
-    visit_count: Arc<AtomicUsize>,
+    info: RelationInfo,
     operator: C,
 }
 
 impl<T, C: Op<T>> RelationInner<T, C> {
     pub(crate) fn foreach(&mut self, current_id: CommitId, mut f: impl FnMut(T, ValueCount)) {
-        self.operator.foreach(current_id, |x, v| {
-            self.visit_count.fetch_add(1, atomic::Ordering::Relaxed);
-            f(x, v)
-        })
+        self.operator.foreach(current_id, |x, v| f(x, v))
     }
 
     pub(crate) fn send_to_broadcast(
@@ -67,15 +79,18 @@ impl<T, C: Op<T>> RelationInner<T, C> {
         T: Clone,
     {
         self.operator
-            .send_to_broadcast(current_id, &self.visit_count, broadcast)
+            .send_to_broadcast(current_id, &mut self.info, broadcast)
     }
 
-    pub(crate) fn dump_to_map(&mut self, current_id: CommitId, map: &mut RolloverMap<T, ValueCount>)
+    pub(crate) fn dump_to_vec(&mut self, current_id: CommitId, vec: &mut Vec<Entry<T>>) {
+        self.operator.dump_to_vec(current_id, &mut self.info, vec);
+    }
+
+    pub(crate) fn dump_to_map(&mut self, current_id: CommitId, map: &mut HashMap<T, ValueCount>)
     where
         T: Eq + Hash,
     {
-        self.operator
-            .dump_to_map(current_id, &self.visit_count, map)
+        self.operator.dump_to_map(current_id, &mut self.info, map)
     }
 }
 
@@ -85,7 +100,9 @@ impl<T, C> Relation<T, C> {
             context_id,
             inner: RelationInner {
                 phantom: PhantomData,
-                visit_count: data.visit_count.clone(),
+                info: RelationInfo {
+                    visit_count: data.visit_count.clone(),
+                },
                 operator,
             },
             data,
@@ -139,25 +156,26 @@ impl<T, C: Op<T>> Relation<T, C> {
         Relation::from_op(self, |r| FlatMap::new(r, g))
     }
 
-    pub fn distinct(self) -> Relation<T, Distinct<T, C>>
-    where
-        T: Eq + Hash + Clone,
-    {
-        Relation::from_op(self, Distinct::new)
-    }
-
     pub fn consolidate(self) -> Relation<T, Consolidate<T, C>>
     where
-        T: Eq + Hash,
+        T: Clone + Eq + Hash,
     {
         Relation::from_op(self, Consolidate::new)
     }
 
-    pub fn concat<CR>(self, other: Relation<T, CR>) -> Relation<T, Concat<T, C, CR>>
+    pub fn consolidate_h(self) -> Relation<T, Consolidate<T, C>>
+    where
+        T: Clone + Eq + Hash,
+    {
+        self.consolidate().hidden()
+    }
+
+    pub fn concat<CR>(self, other: Relation<T, CR>) -> Relation<T, Consolidate<T, Concat<T, C, CR>>>
     where
         CR: Op<T>,
+        T: Clone + Eq + Hash,
     {
-        Relation::from_op((self, other), Concat::new)
+        Relation::from_op((self, other), Concat::new).consolidate_h()
     }
 
     pub fn negate(self) -> Relation<T, Negate<T, C>> {
@@ -168,11 +186,25 @@ impl<T, C: Op<T>> Relation<T, C> {
         Saved::new(self)
     }
 
-    pub fn minus<CR>(self, other: Relation<T, CR>) -> Relation<T, Concat<T, C, Negate<T, CR>>>
+    pub fn minus<CR>(
+        self,
+        other: Relation<T, CR>,
+    ) -> Relation<T, Consolidate<T, Concat<T, C, Negate<T, CR>>>>
     where
         CR: Op<T>,
+        T: Clone + Eq + Hash,
     {
         self.concat(other.negate().hidden()).type_named("minus")
+    }
+
+    pub fn distinct(self) -> Relation<T, impl Op<T>>
+    where
+        T: Eq + Hash + Clone,
+    {
+        self.map_h(|x| (x, ()))
+            .reduce_gen(|_, _: &RolloverMap<(), ValueCount>| ())
+            .fsts()
+            .type_named("distinct")
     }
 
     pub fn flatten<U>(self) -> Relation<U, impl Op<U>>
@@ -217,16 +249,9 @@ impl<T: Eq + Hash + Clone, C: Op<T>> Relation<T, C> {
             .type_named("intersection")
     }
 
-    pub fn set_minus(self, other: Relation<T, impl Op<T>>) -> Relation<T, impl Op<T>> {
-        self.map_h(|t| (t, ()))
-            .antijoin(other)
-            .fsts()
-            .type_named("set_minus")
-    }
-
     pub fn counts(self) -> Relation<(T, isize), impl Op<(T, isize)>> {
         self.map_h(|t| (t, ()))
-            .reduce(|_, vals| {
+            .reduce_gen(|_, vals: &RolloverMap<(), ValueCount>| {
                 let ((), &count) = vals.get_singleton().unwrap();
                 count.0
             })
@@ -263,29 +288,33 @@ where
     pub fn join<VR, CR>(
         self,
         other: Relation<(K, VR), CR>,
-    ) -> Relation<(K, V, VR), InnerJoin<K, V, C, VR, CR>>
+    ) -> Relation<(K, V, VR), Consolidate<(K, V, VR), InnerJoin<K, V, C, VR, CR>>>
     where
         VR: Eq + Hash + Clone,
         CR: Op<(K, VR)>,
     {
-        Relation::from_op((self, other), InnerJoin::new)
+        Relation::from_op((self, other), InnerJoin::new).consolidate_h()
     }
 
-    pub fn reduce<Y, G: Fn(&K, &RolloverMap<V, ValueCount>) -> Y>(
+    pub fn reduce<Y, G: Fn(&K, &RolloverMap<V, ValueCount, 2>) -> Y>(
         self,
         g: G,
-    ) -> Relation<(K, Y), Reduce<K, V, Y, G, RolloverMap<V, ValueCount>, C>>
+    ) -> Relation<(K, Y), Consolidate<(K, Y), Reduce<K, V, Y, G, RolloverMap<V, ValueCount, 2>, C>>>
     where
-        Y: Eq + Clone,
+        Y: Eq + Hash + Clone,
     {
-        Relation::from_op(self, |r| Reduce::new(r, g))
+        self.reduce_gen(g)
     }
 
-    pub fn antijoin<CR: Op<K>>(
+    fn reduce_gen<Y, M, G: Fn(&K, &M) -> Y>(
         self,
-        other: Relation<K, CR>,
-    ) -> Relation<(K, V), AntiJoin<K, V, C, CR>> {
-        Relation::from_op((self, other), AntiJoin::new)
+        g: G,
+    ) -> Relation<(K, Y), Consolidate<(K, Y), Reduce<K, V, Y, G, M, C>>>
+    where
+        M: GenericMap<K = V, V = ValueCount> + Clear + Nullable,
+        Y: Eq + Hash + Clone,
+    {
+        Relation::from_op(self, |r| Reduce::new(r, g)).consolidate_h()
     }
 
     pub fn semijoin(self, other: Relation<K, impl Op<K>>) -> Relation<(K, V), impl Op<(K, V)>> {
@@ -305,10 +334,8 @@ where
     where
         V: Clone + Ord,
     {
-        Relation::from_op(self, |r| {
-            Reduce::new(r, |_: &K, vals: &HashedMaxHeap<V, ValueCount>| {
-                vals.max_key().unwrap().clone()
-            })
+        self.reduce_gen(|_, vals: &RolloverHashedMaxHeap<V, ValueCount, 2>| {
+            vals.max_key().unwrap().clone()
         })
         .type_named("maxes")
     }
@@ -317,10 +344,8 @@ where
     where
         V: Clone + Ord,
     {
-        Relation::from_op(self, |r| {
-            Reduce::new(r, |_: &K, vals: &HashedMinHeap<V, ValueCount>| {
-                vals.min_key().unwrap().clone()
-            })
+        self.reduce_gen(|_, vals: &RolloverHashedMinHeap<V, ValueCount, 2>| {
+            vals.min_key().unwrap().clone()
         })
         .type_named("mins")
     }
