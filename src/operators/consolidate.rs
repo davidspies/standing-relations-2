@@ -23,9 +23,8 @@ impl<T: Eq + Hash, C: Op<T>> Op<T> for Consolidate<T, C> {
         "consolidate"
     }
     fn foreach<F: FnMut(T, ValueCount)>(&mut self, current_id: CommitId, mut f: F) {
-        self.sub_rel.foreach(current_id, |value, count| {
-            self.collected_scratch.add(value, count);
-        });
+        self.sub_rel
+            .dump_to_map(current_id, &mut self.collected_scratch);
         self.collected_scratch
             .drain()
             .for_each(|(value, count)| f(value, count));

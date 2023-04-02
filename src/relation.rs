@@ -67,6 +67,14 @@ impl<T, C: Op<T>> RelationInner<T, C> {
         self.operator
             .send_to_broadcast(current_id, &self.visit_count, broadcast)
     }
+
+    pub(crate) fn dump_to_map(&mut self, current_id: CommitId, map: &mut E1Map<T, ValueCount>)
+    where
+        T: Eq + Hash,
+    {
+        self.operator
+            .dump_to_map(current_id, &self.visit_count, map)
+    }
 }
 
 impl<T, C> Relation<T, C> {

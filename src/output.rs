@@ -20,9 +20,7 @@ struct OutputInner<T, C> {
 
 impl<T: Eq + Hash, C: Op<T>> OutputInner<T, C> {
     fn update(&mut self, commit_id: CommitId) {
-        self.relation.foreach(commit_id, |value, count| {
-            self.values.add(value, count);
-        });
+        self.relation.dump_to_map(commit_id, &mut self.values)
     }
 }
 
