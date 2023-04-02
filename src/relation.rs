@@ -73,16 +73,19 @@ impl<T, C> Relation<T, C> {
         }
     }
 
+    #[track_caller]
     pub fn named(mut self, name: impl Into<String>) -> Self {
         self.data.set_name(name.into());
         self
     }
 
+    #[track_caller]
     pub fn type_named(mut self, type_name: &'static str) -> Self {
         self.data.set_type_name(type_name);
         self
     }
 
+    #[track_caller]
     pub fn hidden(mut self) -> Self {
         self.data.hide();
         self

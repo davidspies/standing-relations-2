@@ -18,6 +18,7 @@ impl RelationData {
         }
     }
 
+    #[track_caller]
     fn on_first_shown(&mut self, f: impl FnOnce(&mut Self)) {
         if self.hidden {
             assert_eq!(self.children.len(), 1);
@@ -28,14 +29,17 @@ impl RelationData {
         }
     }
 
+    #[track_caller]
     pub(super) fn set_name(&mut self, name: String) {
         self.on_first_shown(|data| data.name = Some(name))
     }
 
+    #[track_caller]
     pub(super) fn set_type_name(&mut self, type_name: &'static str) {
         self.on_first_shown(|data| data.type_name = type_name)
     }
 
+    #[track_caller]
     pub(super) fn hide(&mut self) {
         self.on_first_shown(|data| data.hidden = true)
     }
