@@ -5,6 +5,8 @@ use crate::{
     op::Op,
     operators::input::Input,
     relation::RelationInner,
+    value_count::ValueCount,
+    E1Map,
 };
 
 use super::{PipeT, ProcessResult};
@@ -14,6 +16,7 @@ pub(crate) struct FeedbackPipe<T, C> {
     seen: HashSet<T>,
     frame_changes: Vec<HashSet<T>>,
     input: Input<T>,
+    scratch_map: E1Map<T, ValueCount>,
 }
 
 impl<T, C> FeedbackPipe<T, C> {
@@ -23,6 +26,7 @@ impl<T, C> FeedbackPipe<T, C> {
             seen: HashSet::new(),
             frame_changes: Vec::new(),
             input,
+            scratch_map: E1Map::new(),
         }
     }
 }
@@ -31,7 +35,8 @@ impl<T: Eq + Hash + Clone, C: Op<T>> PipeT for FeedbackPipe<T, C> {
     fn process(&mut self, commit_id: CommitId) -> Result<ProcessResult, Dropped> {
         let mut any_dropped = false;
         let mut result = ProcessResult::Unchanged;
-        self.relation.foreach(commit_id, |elem, _| {
+        self.relation.dump_to_map(commit_id, &mut self.scratch_map);
+        for (elem, _) in self.scratch_map.drain() {
             if self.seen.insert(elem.clone()) {
                 result = ProcessResult::Changed;
                 if let Some(frame) = self.frame_changes.last_mut() {
@@ -41,7 +46,7 @@ impl<T: Eq + Hash + Clone, C: Op<T>> PipeT for FeedbackPipe<T, C> {
                     any_dropped = true;
                 }
             }
-        });
+        }
         if any_dropped {
             Err(Dropped)
         } else {
