@@ -4,6 +4,7 @@ use crate::{
     channel::{Receiver, Sender},
     context::{CommitId, ContextId},
     op::Op,
+    relation::Relation,
     value_count::ValueCount,
 };
 
@@ -13,6 +14,8 @@ pub struct Input<T> {
     pub(crate) context_id: ContextId,
     sender: Sender<(T, isize)>,
 }
+
+pub type InputRelation<T> = Relation<T, InputOp<T>>;
 
 impl<T> Input<T> {
     pub(crate) fn new(context_id: ContextId, sender: Sender<(T, isize)>) -> Self {
