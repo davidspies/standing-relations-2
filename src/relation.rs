@@ -12,6 +12,7 @@ use std::{
 };
 
 use crate::{
+    broadcast_channel,
     context::{CommitId, ContextId},
     e1map::{E1HashMaxHeap, E1HashMinHeap, E1Map},
     op::{DynOp, Op},
@@ -48,15 +49,23 @@ pub(crate) struct RelationInner<T, C> {
     operator: C,
 }
 
-impl<T, C> RelationInner<T, C> {
-    pub(crate) fn foreach(&mut self, current_id: CommitId, mut f: impl FnMut(T, ValueCount))
-    where
-        C: Op<T>,
-    {
+impl<T, C: Op<T>> RelationInner<T, C> {
+    pub(crate) fn foreach(&mut self, current_id: CommitId, mut f: impl FnMut(T, ValueCount)) {
         self.operator.foreach(current_id, |x, v| {
             self.visit_count.fetch_add(1, atomic::Ordering::Relaxed);
             f(x, v)
         })
+    }
+
+    pub(crate) fn send_to_broadcast(
+        &mut self,
+        current_id: CommitId,
+        broadcast: &mut broadcast_channel::Sender<(T, ValueCount)>,
+    ) where
+        T: Clone,
+    {
+        self.operator
+            .send_to_broadcast(current_id, &self.visit_count, broadcast)
     }
 }
 
@@ -163,10 +172,7 @@ impl<T, C: Op<T>> Relation<T, C> {
         self.flat_map(identity).type_named("flatten")
     }
 
-    pub fn map<U>(self, f: impl Fn(T) -> U) -> Relation<U, impl Op<U>>
-    where
-        C: Op<T>,
-    {
+    pub fn map<U>(self, f: impl Fn(T) -> U) -> Relation<U, impl Op<U>> {
         self.flat_map(move |x| iter::once(f(x))).type_named("map")
     }
 
