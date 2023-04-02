@@ -30,9 +30,7 @@ impl<T, C> Interrupt<T, C> {
 
 impl<T: Eq + Hash, C: Op<T>> PipeT for Interrupt<T, C> {
     fn process(&mut self, commit_id: CommitId) -> Result<ProcessResult, Dropped> {
-        self.relation.foreach(commit_id, |elem, value_count| {
-            self.values.add(elem, value_count);
-        });
+        self.relation.dump_to_map(commit_id, &mut self.values);
         if self.values.is_empty() {
             Ok(ProcessResult::Unchanged)
         } else {
