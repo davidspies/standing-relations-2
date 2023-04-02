@@ -17,12 +17,11 @@ use crate::{
 };
 
 use self::pipes::{
-    feedback::FeedbackPipe,
-    interrupt::{Interrupt, InterruptId},
-    tracked::TrackedInputPipe,
-    untracked::UntrackedInputPipe,
-    PipeT, ProcessResult,
+    feedback::FeedbackPipe, interrupt::Interrupt, tracked::TrackedInputPipe,
+    untracked::UntrackedInputPipe, PipeT, ProcessResult,
 };
+
+pub use self::pipes::interrupt::InterruptId;
 
 mod pipes;
 

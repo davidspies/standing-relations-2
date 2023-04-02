@@ -167,6 +167,14 @@ impl<T, C: Op<T>> Relation<T, C> {
         self.flat_map(move |x| iter::once(f(x))).type_named("map")
     }
 
+    pub fn filter(self, f: impl Fn(&T) -> bool) -> Relation<T, impl Op<T>>
+    where
+        C: Op<T>,
+    {
+        self.flat_map(move |x| if f(&x) { Some(x) } else { None })
+            .type_named("filter")
+    }
+
     pub fn map_h<U>(self, f: impl Fn(T) -> U) -> Relation<U, impl Op<U>>
     where
         C: Op<T>,
@@ -265,6 +273,13 @@ where
         self.join(other.map_h(|t| (t, ())))
             .map_h(|(k, v, ())| (k, v))
             .type_named("semijoin")
+    }
+
+    pub fn join_values<VR: Eq + Hash + Clone>(
+        self,
+        other: Relation<(K, VR), impl Op<(K, VR)>>,
+    ) -> Relation<(V, VR), impl Op<(V, VR)>> {
+        self.join(other).map_h(|(_k, vl, vr)| (vl, vr))
     }
 
     pub fn maxes(self) -> Relation<(K, V), impl Op<(K, V)>>

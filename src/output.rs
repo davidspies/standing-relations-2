@@ -5,7 +5,12 @@ use std::{
 };
 
 use crate::{
-    context::CommitId, e1map::E1Map, op::Op, relation::RelationInner, value_count::ValueCount,
+    context::CommitId,
+    e1map::E1Map,
+    op::{DynOp, Op},
+    operators::save::SavedOp,
+    relation::RelationInner,
+    value_count::ValueCount,
 };
 
 struct OutputInner<T, C> {
@@ -21,10 +26,12 @@ impl<T: Eq + Hash, C: Op<T>> OutputInner<T, C> {
     }
 }
 
-pub struct Output<T, C> {
+pub struct Output<T, C = Box<dyn DynOp<T>>> {
     inner: RefCell<OutputInner<T, C>>,
     commit_id: Rc<Cell<CommitId>>,
 }
+
+pub type SavedOutput<T> = Output<T, SavedOp<T, Box<dyn DynOp<T>>>>;
 
 impl<T, C> Output<T, C> {
     pub(crate) fn new(relation: RelationInner<T, C>, commit_id: Rc<Cell<CommitId>>) -> Self {
