@@ -3,14 +3,15 @@
 use std::hash::Hash;
 
 use crate::{
-    context::CommitId, e1map::E1Map, op::Op, relation::RelationInner, value_count::ValueCount,
+    context::CommitId, op::Op, relation::RelationInner, rollover_map::RolloverMap,
+    value_count::ValueCount,
 };
 
 pub struct InnerJoin<K, VL, CL, VR, CR> {
     left_rel: RelationInner<(K, VL), CL>,
     right_rel: RelationInner<(K, VR), CR>,
-    left_values: E1Map<K, E1Map<VL, ValueCount>>,
-    right_values: E1Map<K, E1Map<VR, ValueCount>>,
+    left_values: RolloverMap<K, RolloverMap<VL, ValueCount>>,
+    right_values: RolloverMap<K, RolloverMap<VR, ValueCount>>,
 }
 
 impl<K, VL, CL, VR, CR> InnerJoin<K, VL, CL, VR, CR> {
@@ -20,8 +21,8 @@ impl<K, VL, CL, VR, CR> InnerJoin<K, VL, CL, VR, CR> {
         Self {
             left_rel,
             right_rel,
-            left_values: E1Map::default(),
-            right_values: E1Map::default(),
+            left_values: RolloverMap::default(),
+            right_values: RolloverMap::default(),
         }
     }
 }

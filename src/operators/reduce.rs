@@ -5,14 +5,14 @@ use std::{
 };
 
 use crate::{
-    add_to_value::AddToValue, context::CommitId, e1map::E1Map, nullable::Nullable, op::Op,
-    relation::RelationInner, value_count::ValueCount,
+    add_to_value::AddToValue, context::CommitId, nullable::Nullable, op::Op,
+    relation::RelationInner, rollover_map::RolloverMap, value_count::ValueCount,
 };
 
 pub struct Reduce<K, V, Y, G, M, C> {
     sub_rel: RelationInner<(K, V), C>,
     g: G,
-    aggregated_values: E1Map<K, M>,
+    aggregated_values: RolloverMap<K, M>,
     outputs: HashMap<K, Y>,
     changed_keys_scratch: HashSet<K>,
 }
@@ -22,7 +22,7 @@ impl<K, V, Y, G, M: Default, C> Reduce<K, V, Y, G, M, C> {
         Self {
             sub_rel,
             g,
-            aggregated_values: E1Map::default(),
+            aggregated_values: RolloverMap::default(),
             outputs: HashMap::default(),
             changed_keys_scratch: HashSet::default(),
         }

@@ -1,13 +1,13 @@
 use std::{collections::HashMap, hash::Hash};
 
 use crate::{
-    add_to_value::ValueChanges, context::CommitId, e1map::E1Map, op::Op, relation::RelationInner,
-    value_count::ValueCount,
+    add_to_value::ValueChanges, context::CommitId, op::Op, relation::RelationInner,
+    rollover_map::RolloverMap, value_count::ValueCount,
 };
 
 pub struct Distinct<T, C> {
     sub_rel: RelationInner<T, C>,
-    current_counts: E1Map<T, ValueCount>,
+    current_counts: RolloverMap<T, ValueCount>,
     changed_scratch: HashMap<T, DistinctChange>,
 }
 
@@ -15,7 +15,7 @@ impl<T, C> Distinct<T, C> {
     pub(crate) fn new(sub_rel: RelationInner<T, C>) -> Self {
         Self {
             sub_rel,
-            current_counts: E1Map::default(),
+            current_counts: RolloverMap::default(),
             changed_scratch: HashMap::default(),
         }
     }

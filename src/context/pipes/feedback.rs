@@ -5,8 +5,8 @@ use crate::{
     op::Op,
     operators::input::Input,
     relation::RelationInner,
+    rollover_map::RolloverMap,
     value_count::ValueCount,
-    E1Map,
 };
 
 use super::{PipeT, ProcessResult};
@@ -16,7 +16,7 @@ pub(crate) struct FeedbackPipe<T, C> {
     seen: HashSet<T>,
     frame_changes: Vec<HashSet<T>>,
     input: Input<T>,
-    scratch_map: E1Map<T, ValueCount>,
+    scratch_map: RolloverMap<T, ValueCount>,
 }
 
 impl<T, C> FeedbackPipe<T, C> {
@@ -26,7 +26,7 @@ impl<T, C> FeedbackPipe<T, C> {
             seen: HashSet::new(),
             frame_changes: Vec::new(),
             input,
-            scratch_map: E1Map::new(),
+            scratch_map: RolloverMap::new(),
         }
     }
 }

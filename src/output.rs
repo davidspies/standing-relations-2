@@ -6,16 +6,16 @@ use std::{
 
 use crate::{
     context::CommitId,
-    e1map::E1Map,
     op::{DynOp, Op},
     operators::save::SavedOp,
     relation::RelationInner,
+    rollover_map::RolloverMap,
     value_count::ValueCount,
 };
 
 struct OutputInner<T, C> {
     relation: RelationInner<T, C>,
-    values: E1Map<T, ValueCount>,
+    values: RolloverMap<T, ValueCount>,
 }
 
 impl<T: Eq + Hash, C: Op<T>> OutputInner<T, C> {
@@ -36,13 +36,13 @@ impl<T, C> Output<T, C> {
         Output {
             inner: RefCell::new(OutputInner {
                 relation,
-                values: E1Map::new(),
+                values: RolloverMap::new(),
             }),
             commit_id,
         }
     }
 
-    pub fn get(&self) -> Ref<E1Map<T, ValueCount>>
+    pub fn get(&self) -> Ref<RolloverMap<T, ValueCount>>
     where
         T: Eq + Hash,
         C: Op<T>,

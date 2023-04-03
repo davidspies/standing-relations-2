@@ -11,7 +11,7 @@ use crate::{
 
 #[derive(Debug, Derivative)]
 #[derivative(Default(bound = "V: Default, M: Default"))]
-pub struct E1Map<K, V, M = HashMap<K, V>> {
+pub struct RolloverMap<K, V, M = HashMap<K, V>> {
     singleton_key: Option<K>,
     singleton_value: V,
     non_singleton: M,
@@ -23,7 +23,7 @@ pub type Iter<'a, K, V, M = HashMap<K, V>> =
 pub type IntoIter<K, V, M = HashMap<K, V>> =
     Chain<option::IntoIter<(K, V)>, <M as IntoIterator>::IntoIter>;
 
-impl<K, V, M> E1Map<K, V, M> {
+impl<K, V, M> RolloverMap<K, V, M> {
     pub fn new() -> Self
     where
         V: Default,
@@ -69,7 +69,7 @@ impl<K, V, M> E1Map<K, V, M> {
     }
 }
 
-impl<K: Eq, V, M: IsMap<K, V>> E1Map<K, V, M> {
+impl<K: Eq, V, M: IsMap<K, V>> RolloverMap<K, V, M> {
     pub(crate) fn drain(&mut self) -> impl Iterator<Item = (K, V)> + '_
     where
         V: Default,
@@ -135,11 +135,11 @@ impl<K: Eq, V, M: IsMap<K, V>> E1Map<K, V, M> {
     }
 }
 
-pub type E1HashMaxHeap<K, V> = E1Map<K, V, HashMaxHeap<K, V>>;
+pub type RolloverHashMaxHeap<K, V> = RolloverMap<K, V, HashMaxHeap<K, V>>;
 
-pub type E1HashMinHeap<K, V> = E1Map<K, V, HashMinHeap<K, V>>;
+pub type RolloverHashMinHeap<K, V> = RolloverMap<K, V, HashMinHeap<K, V>>;
 
-impl<K: Ord + Hash, V> E1HashMaxHeap<K, V> {
+impl<K: Ord + Hash, V> RolloverHashMaxHeap<K, V> {
     pub fn max_key_value(&self) -> Option<(&K, &V)> {
         match &self.singleton_key {
             Some(k) => Some((k, &self.singleton_value)),
@@ -148,7 +148,7 @@ impl<K: Ord + Hash, V> E1HashMaxHeap<K, V> {
     }
 }
 
-impl<K: Ord + Hash, V> E1HashMinHeap<K, V> {
+impl<K: Ord + Hash, V> RolloverHashMinHeap<K, V> {
     pub fn min_key_value(&self) -> Option<(&K, &V)> {
         match &self.singleton_key {
             Some(k) => Some((k, &self.singleton_value)),
@@ -157,7 +157,7 @@ impl<K: Ord + Hash, V> E1HashMinHeap<K, V> {
     }
 }
 
-impl<'a, K, V, M> IntoIterator for &'a E1Map<K, V, M>
+impl<'a, K, V, M> IntoIterator for &'a RolloverMap<K, V, M>
 where
     &'a M: IntoIterator<Item = (&'a K, &'a V)>,
 {
@@ -170,7 +170,7 @@ where
     }
 }
 
-impl<K, V, M> IntoIterator for E1Map<K, V, M>
+impl<K, V, M> IntoIterator for RolloverMap<K, V, M>
 where
     M: IntoIterator<Item = (K, V)>,
 {
@@ -183,16 +183,16 @@ where
     }
 }
 
-impl<K, V: Default, M: Nullable> Nullable for E1Map<K, V, M> {
+impl<K, V: Default, M: Nullable> Nullable for RolloverMap<K, V, M> {
     fn is_empty(&self) -> bool {
         self.is_empty()
     }
 }
 
-impl<T: AddToValue<V>, K: Eq + Hash, V: Nullable, M: IsMap<K, V>> AddToValue<E1Map<K, V, M>>
+impl<T: AddToValue<V>, K: Eq + Hash, V: Nullable, M: IsMap<K, V>> AddToValue<RolloverMap<K, V, M>>
     for (K, T)
 {
-    fn add_to(self, v: &mut E1Map<K, V, M>) -> ValueChanges {
+    fn add_to(self, v: &mut RolloverMap<K, V, M>) -> ValueChanges {
         let (key, value) = self;
         v.add(key, value)
     }

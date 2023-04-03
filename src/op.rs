@@ -3,7 +3,9 @@ use std::{
     sync::atomic::{self, AtomicUsize},
 };
 
-use crate::{broadcast_channel, context::CommitId, value_count::ValueCount, E1Map};
+use crate::{
+    broadcast_channel, context::CommitId, rollover_map::RolloverMap, value_count::ValueCount,
+};
 
 pub trait Op<T> {
     fn type_name(&self) -> &'static str;
@@ -12,7 +14,7 @@ pub trait Op<T> {
         &mut self,
         current_id: CommitId,
         visit_count: &AtomicUsize,
-        map: &mut E1Map<T, ValueCount>,
+        map: &mut RolloverMap<T, ValueCount>,
     ) where
         T: Eq + Hash,
     {
@@ -52,7 +54,7 @@ pub trait DynOp<T> {
         &mut self,
         current_id: CommitId,
         visit_count: &AtomicUsize,
-        map: &mut E1Map<T, ValueCount>,
+        map: &mut RolloverMap<T, ValueCount>,
     ) where
         T: Eq + Hash;
     fn send_to_broadcast(
@@ -75,7 +77,7 @@ impl<T, C: Op<T>> DynOp<T> for C {
         &mut self,
         current_id: CommitId,
         visit_count: &AtomicUsize,
-        map: &mut E1Map<T, ValueCount>,
+        map: &mut RolloverMap<T, ValueCount>,
     ) where
         T: Eq + Hash,
     {
@@ -104,7 +106,7 @@ impl<T> Op<T> for dyn DynOp<T> + '_ {
         &mut self,
         current_id: CommitId,
         visit_count: &AtomicUsize,
-        map: &mut E1Map<T, ValueCount>,
+        map: &mut RolloverMap<T, ValueCount>,
     ) where
         T: Eq + Hash,
     {

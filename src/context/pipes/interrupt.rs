@@ -2,9 +2,9 @@ use std::hash::Hash;
 
 use crate::{
     context::{CommitId, Dropped},
-    e1map::E1Map,
     op::Op,
     relation::RelationInner,
+    rollover_map::RolloverMap,
     value_count::ValueCount,
 };
 
@@ -15,7 +15,7 @@ pub type InterruptId = usize;
 pub struct Interrupt<T, C> {
     relation: RelationInner<T, C>,
     interrupt_id: InterruptId,
-    values: E1Map<T, ValueCount>,
+    values: RolloverMap<T, ValueCount>,
 }
 
 impl<T, C> Interrupt<T, C> {
@@ -23,7 +23,7 @@ impl<T, C> Interrupt<T, C> {
         Self {
             relation,
             interrupt_id,
-            values: E1Map::new(),
+            values: RolloverMap::new(),
         }
     }
 }

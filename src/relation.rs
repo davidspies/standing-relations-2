@@ -14,7 +14,6 @@ use std::{
 use crate::{
     broadcast_channel,
     context::{CommitId, ContextId},
-    e1map::{E1HashMaxHeap, E1HashMinHeap, E1Map},
     op::{DynOp, Op},
     operators::{
         antijoin::AntiJoin,
@@ -28,6 +27,7 @@ use crate::{
         save::Saved,
         split::{Split, SplitOp},
     },
+    rollover_map::{RolloverHashMaxHeap, RolloverHashMinHeap, RolloverMap},
     value_count::ValueCount,
 };
 
@@ -68,7 +68,7 @@ impl<T, C: Op<T>> RelationInner<T, C> {
             .send_to_broadcast(current_id, &self.visit_count, broadcast)
     }
 
-    pub(crate) fn dump_to_map(&mut self, current_id: CommitId, map: &mut E1Map<T, ValueCount>)
+    pub(crate) fn dump_to_map(&mut self, current_id: CommitId, map: &mut RolloverMap<T, ValueCount>)
     where
         T: Eq + Hash,
     {
@@ -114,7 +114,7 @@ impl<T, C: Op<T>> Relation<T, C> {
         subrels: Subrels,
         operator: impl FnOnce(Subrels::Inner) -> C,
     ) -> Self {
-        let mut context_ids = E1Map::new();
+        let mut context_ids = RolloverMap::new();
         subrels.add_context_ids(&mut context_ids);
         let mut children = Vec::new();
         let inner = subrels.push_datas(&mut children);
@@ -269,10 +269,10 @@ where
         Relation::from_op((self, other), InnerJoin::new)
     }
 
-    pub fn reduce<Y, G: Fn(&K, &E1Map<V, ValueCount>) -> Y>(
+    pub fn reduce<Y, G: Fn(&K, &RolloverMap<V, ValueCount>) -> Y>(
         self,
         g: G,
-    ) -> Relation<(K, Y), Reduce<K, V, Y, G, E1Map<V, ValueCount>, C>>
+    ) -> Relation<(K, Y), Reduce<K, V, Y, G, RolloverMap<V, ValueCount>, C>>
     where
         Y: Eq + Clone,
     {
@@ -304,7 +304,7 @@ where
         V: Clone + Ord,
     {
         Relation::from_op(self, |r| {
-            Reduce::new(r, |_: &K, vals: &E1HashMaxHeap<V, ValueCount>| {
+            Reduce::new(r, |_: &K, vals: &RolloverHashMaxHeap<V, ValueCount>| {
                 let (v, _) = vals.max_key_value().unwrap();
                 v.clone()
             })
@@ -317,7 +317,7 @@ where
         V: Clone + Ord,
     {
         Relation::from_op(self, |r| {
-            Reduce::new(r, |_: &K, vals: &E1HashMinHeap<V, ValueCount>| {
+            Reduce::new(r, |_: &K, vals: &RolloverHashMinHeap<V, ValueCount>| {
                 let (v, _) = vals.min_key_value().unwrap();
                 v.clone()
             })

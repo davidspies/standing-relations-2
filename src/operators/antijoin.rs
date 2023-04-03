@@ -1,15 +1,15 @@
 use std::hash::Hash;
 
 use crate::{
-    add_to_value::ValueChanges, context::CommitId, e1map::E1Map, op::Op, relation::RelationInner,
-    value_count::ValueCount,
+    add_to_value::ValueChanges, context::CommitId, op::Op, relation::RelationInner,
+    rollover_map::RolloverMap, value_count::ValueCount,
 };
 
 pub struct AntiJoin<K, V, CL, CR> {
     left_rel: RelationInner<(K, V), CL>,
     right_rel: RelationInner<K, CR>,
-    left_values: E1Map<K, E1Map<V, ValueCount>>,
-    right_values: E1Map<K, ValueCount>,
+    left_values: RolloverMap<K, RolloverMap<V, ValueCount>>,
+    right_values: RolloverMap<K, ValueCount>,
 }
 
 impl<K, V, CL, CR> AntiJoin<K, V, CL, CR> {
@@ -19,8 +19,8 @@ impl<K, V, CL, CR> AntiJoin<K, V, CL, CR> {
         Self {
             left_rel,
             right_rel,
-            left_values: E1Map::default(),
-            right_values: E1Map::default(),
+            left_values: RolloverMap::default(),
+            right_values: RolloverMap::default(),
         }
     }
 }
