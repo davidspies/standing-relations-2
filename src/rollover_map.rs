@@ -1,5 +1,12 @@
-use std::{collections::HashMap, hash::Hash, iter::Chain, mem, option};
+use std::{
+    array,
+    collections::HashMap,
+    hash::Hash,
+    iter::{Chain, Zip},
+    mem, slice,
+};
 
+use arrayvec::ArrayVec;
 use derivative::Derivative;
 
 use crate::{
@@ -10,23 +17,23 @@ use crate::{
 };
 
 #[derive(Debug, Derivative)]
-#[derivative(Default(bound = "V: Default, M: Default"))]
-pub struct RolloverMap<K, V, M = HashMap<K, V>> {
-    singleton_key: Option<K>,
-    singleton_value: V,
-    non_singleton: M,
+#[derivative(Default(bound = "[V; N]: Default, M: Default"))]
+pub struct RolloverMap<K, V, const N: usize = 1, M = HashMap<K, V>> {
+    stack_keys: ArrayVec<K, N>,
+    stack_values: [V; N],
+    heap: M,
 }
 
 pub type Iter<'a, K, V, M = HashMap<K, V>> =
-    Chain<option::IntoIter<(&'a K, &'a V)>, <&'a M as IntoIterator>::IntoIter>;
+    Chain<Zip<slice::Iter<'a, K>, slice::Iter<'a, V>>, <&'a M as IntoIterator>::IntoIter>;
 
-pub type IntoIter<K, V, M = HashMap<K, V>> =
-    Chain<option::IntoIter<(K, V)>, <M as IntoIterator>::IntoIter>;
+pub type IntoIter<K, V, const N: usize, M = HashMap<K, V>> =
+    Chain<Zip<arrayvec::IntoIter<K, N>, array::IntoIter<V, N>>, <M as IntoIterator>::IntoIter>;
 
-impl<K, V, M> RolloverMap<K, V, M> {
+impl<K, V, const N: usize, M> RolloverMap<K, V, N, M> {
     pub fn new() -> Self
     where
-        V: Default,
+        [V; N]: Default,
         M: Default,
     {
         Self::default()
@@ -36,62 +43,70 @@ impl<K, V, M> RolloverMap<K, V, M> {
     where
         M: Nullable,
     {
-        self.singleton_key.is_none() && self.non_singleton.is_empty()
+        self.stack_keys.is_empty() && self.heap.is_empty()
     }
 
     pub fn iter<'a>(&'a self) -> Iter<'a, K, V, M>
     where
         &'a M: IntoIterator<Item = (&'a K, &'a V)>,
     {
-        self.get_singleton()
-            .into_iter()
-            .chain(self.non_singleton.into_iter())
+        self.stack_keys
+            .iter()
+            .zip(self.stack_values.iter())
+            .chain(self.heap.into_iter())
     }
 
-    pub fn into_iter(self) -> IntoIter<K, V, M>
+    pub fn into_iter(self) -> IntoIter<K, V, N, M>
     where
         M: IntoIterator<Item = (K, V)>,
     {
-        self.singleton_key
-            .map(|k| (k, self.singleton_value))
+        self.stack_keys
             .into_iter()
-            .chain(self.non_singleton.into_iter())
+            .zip(self.stack_values.into_iter())
+            .chain(self.heap.into_iter())
     }
 
     pub(crate) fn into_singleton(self) -> Option<(K, V)> {
-        self.singleton_key.map(|k| (k, self.singleton_value))
+        (self.stack_keys.len() == 1).then(|| {
+            (
+                self.stack_keys.into_iter().next().unwrap(),
+                self.stack_values.into_iter().next().unwrap(),
+            )
+        })
     }
 
     pub fn get_singleton(&self) -> Option<(&K, &V)> {
-        self.singleton_key
-            .as_ref()
-            .map(|k| (k, &self.singleton_value))
+        (self.stack_keys.len() == 1).then(|| (&self.stack_keys[0], &self.stack_values[0]))
     }
 }
 
-impl<K: Eq, V, M: IsMap<K, V>> RolloverMap<K, V, M> {
+impl<K: Eq, V, const N: usize, M: IsMap<K, V>> RolloverMap<K, V, N, M> {
     pub(crate) fn drain(&mut self) -> impl Iterator<Item = (K, V)> + '_
     where
         V: Default,
     {
-        self.singleton_key
-            .take()
-            .map(|k| (k, mem::take(&mut self.singleton_value)))
-            .into_iter()
-            .chain(self.non_singleton.drain())
+        self.stack_keys
+            .drain(..)
+            .zip(self.stack_values.iter_mut().map(mem::take))
+            .chain(self.heap.drain())
     }
 
     pub fn contains_key(&self, key: &K) -> bool {
-        match &self.singleton_key {
-            Some(k) => key == k,
-            None => self.non_singleton.contains_key(key),
+        if self.stack_keys.is_empty() {
+            self.heap.contains_key(key)
+        } else {
+            self.stack_keys.contains(key)
         }
     }
 
     pub fn get(&self, key: &K) -> Option<&V> {
-        match &self.singleton_key {
-            Some(k) => (key == k).then_some(&self.singleton_value),
-            None => self.non_singleton.get(key),
+        if self.stack_keys.is_empty() {
+            self.heap.get(key)
+        } else {
+            self.stack_keys
+                .iter()
+                .zip(self.stack_values.iter())
+                .find_map(|(k, v)| (k == key).then(|| v))
         }
     }
 
@@ -99,65 +114,80 @@ impl<K: Eq, V, M: IsMap<K, V>> RolloverMap<K, V, M> {
     where
         V: Nullable,
     {
-        match self.singleton_key.take() {
-            Some(k) => {
-                if key == k {
-                    let result = value.add_to(&mut self.singleton_value);
-                    if !self.singleton_value.is_empty() {
-                        self.singleton_key = Some(k);
+        let mut iter = self.stack_keys.iter_mut().zip(self.stack_values.iter_mut());
+        for (mut k, mut v) in &mut iter {
+            if k == &key {
+                let result = value.add_to(v);
+                if v.is_empty() {
+                    for (next_k, next_v) in iter {
+                        mem::swap(k, next_k);
+                        mem::swap(v, next_v);
+                        k = next_k;
+                        v = next_v;
                     }
-                    result
-                } else {
-                    self.non_singleton
-                        .insert_new(k, mem::take(&mut self.singleton_value));
-                    let result = self.non_singleton.add(key, value);
-                    assert_eq!(self.non_singleton.len(), 2);
-                    result
+                    self.stack_keys.pop();
+                }
+                return result;
+            }
+        }
+
+        if self.stack_keys.len() == N {
+            for (k, v) in self
+                .stack_keys
+                .drain(..)
+                .zip(self.stack_values.iter_mut().map(mem::take))
+            {
+                self.heap.insert_new(k, v);
+            }
+        }
+
+        if self.heap.is_empty() {
+            self.stack_keys.push(key);
+            value.add_to(&mut self.stack_values[self.stack_keys.len() - 1])
+        } else {
+            let result = self.heap.add(key, value);
+            if self.heap.len() == N {
+                for ((k, v), val) in self.heap.drain().zip(self.stack_values.iter_mut()) {
+                    self.stack_keys.push(k);
+                    *val = v;
                 }
             }
-            None => {
-                if self.non_singleton.is_empty() {
-                    self.singleton_key = Some(key);
-                    let result = value.add_to(&mut self.singleton_value);
-                    assert!(!self.singleton_value.is_empty());
-                    result
-                } else {
-                    let result = self.non_singleton.add(key, value);
-                    if self.non_singleton.len() == 1 {
-                        let (k, v) = self.non_singleton.drain().next().unwrap();
-                        self.singleton_key = Some(k);
-                        self.singleton_value = v;
-                    }
-                    result
-                }
-            }
+            result
         }
     }
 }
 
-pub type RolloverHashMaxHeap<K, V> = RolloverMap<K, V, HashMaxHeap<K, V>>;
+pub type RolloverHashMaxHeap<K, V, const N: usize = 1> = RolloverMap<K, V, N, HashMaxHeap<K, V>>;
 
-pub type RolloverHashMinHeap<K, V> = RolloverMap<K, V, HashMinHeap<K, V>>;
+pub type RolloverHashMinHeap<K, V, const N: usize = 1> = RolloverMap<K, V, N, HashMinHeap<K, V>>;
 
-impl<K: Ord + Hash, V> RolloverHashMaxHeap<K, V> {
+impl<K: Ord + Hash, V, const N: usize> RolloverHashMaxHeap<K, V, N> {
     pub fn max_key_value(&self) -> Option<(&K, &V)> {
-        match &self.singleton_key {
-            Some(k) => Some((k, &self.singleton_value)),
-            None => self.non_singleton.max_key_value(),
+        if self.stack_keys.is_empty() {
+            self.heap.max_key_value()
+        } else {
+            self.stack_keys
+                .iter()
+                .zip(&self.stack_values)
+                .max_by(|(k1, _), (k2, _)| k1.cmp(k2))
         }
     }
 }
 
-impl<K: Ord + Hash, V> RolloverHashMinHeap<K, V> {
+impl<K: Ord + Hash, V, const N: usize> RolloverHashMinHeap<K, V, N> {
     pub fn min_key_value(&self) -> Option<(&K, &V)> {
-        match &self.singleton_key {
-            Some(k) => Some((k, &self.singleton_value)),
-            None => self.non_singleton.min_key_value(),
+        if self.stack_keys.is_empty() {
+            self.heap.min_key_value()
+        } else {
+            self.stack_keys
+                .iter()
+                .zip(&self.stack_values)
+                .min_by(|(k1, _), (k2, _)| k1.cmp(k2))
         }
     }
 }
 
-impl<'a, K, V, M> IntoIterator for &'a RolloverMap<K, V, M>
+impl<'a, K, V, const N: usize, M> IntoIterator for &'a RolloverMap<K, V, N, M>
 where
     &'a M: IntoIterator<Item = (&'a K, &'a V)>,
 {
@@ -170,29 +200,32 @@ where
     }
 }
 
-impl<K, V, M> IntoIterator for RolloverMap<K, V, M>
+impl<K, V, const N: usize, M> IntoIterator for RolloverMap<K, V, N, M>
 where
     M: IntoIterator<Item = (K, V)>,
 {
     type Item = (K, V);
 
-    type IntoIter = IntoIter<K, V, M>;
+    type IntoIter = IntoIter<K, V, N, M>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.into_iter()
     }
 }
 
-impl<K, V: Default, M: Nullable> Nullable for RolloverMap<K, V, M> {
+impl<K, V: Default, M: Nullable, const N: usize> Nullable for RolloverMap<K, V, N, M>
+where
+    [V; N]: Default,
+{
     fn is_empty(&self) -> bool {
         self.is_empty()
     }
 }
 
-impl<T: AddToValue<V>, K: Eq + Hash, V: Nullable, M: IsMap<K, V>> AddToValue<RolloverMap<K, V, M>>
-    for (K, T)
+impl<T: AddToValue<V>, K: Eq + Hash, V: Nullable, const N: usize, M: IsMap<K, V>>
+    AddToValue<RolloverMap<K, V, N, M>> for (K, T)
 {
-    fn add_to(self, v: &mut RolloverMap<K, V, M>) -> ValueChanges {
+    fn add_to(self, v: &mut RolloverMap<K, V, N, M>) -> ValueChanges {
         let (key, value) = self;
         v.add(key, value)
     }
