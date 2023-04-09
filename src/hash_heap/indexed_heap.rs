@@ -23,8 +23,7 @@ impl<T, C: Comparator<T>> IndexedHeap<T, C> {
     pub(super) fn insert(&mut self, val: T, changed_indices_scratch: &mut Vec<usize>) -> usize {
         let mut new_index = self.values.len();
         self.values.push(val);
-        while new_index != 0 {
-            let parent_index = parent(new_index);
+        while let Some(parent_index) = parent(new_index) {
             if !self
                 .comparator
                 .favors(&self.values[new_index], &self.values[parent_index])
@@ -45,8 +44,7 @@ impl<T, C: Comparator<T>> IndexedHeap<T, C> {
             return;
         }
         let mut current_index = index;
-        loop {
-            let parent_index = parent(current_index);
+        while let Some(parent_index) = parent(current_index) {
             if current_index == 0
                 || !self
                     .comparator
@@ -92,8 +90,12 @@ impl<T, C> Index<usize> for IndexedHeap<T, C> {
     }
 }
 
-fn parent(i: usize) -> usize {
-    (i - 1) / 2
+fn parent(i: usize) -> Option<usize> {
+    if i == 0 {
+        None
+    } else {
+        Some((i - 1) / 2)
+    }
 }
 
 fn children(i: usize) -> (usize, usize) {
