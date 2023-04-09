@@ -16,6 +16,7 @@ pub(crate) struct FeedbackPipe<T, C> {
     seen: HashSet<T>,
     frame_changes: Vec<HashSet<T>>,
     input: Input<T>,
+    tracked_map: RolloverMap<T, ValueCount>,
     scratch_map: RolloverMap<T, ValueCount>,
 }
 
@@ -26,6 +27,7 @@ impl<T, C> FeedbackPipe<T, C> {
             seen: HashSet::new(),
             frame_changes: Vec::new(),
             input,
+            tracked_map: RolloverMap::new(),
             scratch_map: RolloverMap::new(),
         }
     }
@@ -36,8 +38,11 @@ impl<T: Eq + Hash + Clone, C: Op<T>> PipeT for FeedbackPipe<T, C> {
         let mut any_dropped = false;
         let mut result = ProcessResult::Unchanged;
         self.relation.dump_to_map(commit_id, &mut self.scratch_map);
+        for (elem, count) in self.scratch_map.iter() {
+            self.tracked_map.add(elem.clone(), *count);
+        }
         for (elem, _) in self.scratch_map.drain() {
-            if self.seen.insert(elem.clone()) {
+            if self.tracked_map.contains_key(&elem) && self.seen.insert(elem.clone()) {
                 result = ProcessResult::Changed;
                 if let Some(frame) = self.frame_changes.last_mut() {
                     frame.insert(elem.clone());
