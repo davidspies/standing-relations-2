@@ -169,6 +169,8 @@ impl ExecutionContext<'_> {
     }
 
     pub fn with_frame<R>(&mut self, f: impl FnOnce(&mut Self) -> R) -> R {
+        self.one_pass();
+
         let mut i = self.feedback_pipes.first_index();
         while i.is_some() {
             let next_i = self.feedback_pipes.next_index(i);
@@ -194,6 +196,7 @@ impl ExecutionContext<'_> {
             i = next_i;
         }
 
+        self.one_pass();
         result
     }
 
