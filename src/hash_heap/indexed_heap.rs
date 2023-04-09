@@ -19,7 +19,7 @@ impl<T, C> IndexedHeap<T, C> {
     }
 }
 
-impl<T: Ord, C: Comparator> IndexedHeap<T, C> {
+impl<T, C: Comparator<T>> IndexedHeap<T, C> {
     pub(super) fn insert(&mut self, val: T, changed_indices_scratch: &mut Vec<usize>) -> usize {
         let mut new_index = self.values.len();
         self.values.push(val);
@@ -45,6 +45,19 @@ impl<T: Ord, C: Comparator> IndexedHeap<T, C> {
             return;
         }
         let mut current_index = index;
+        loop {
+            let parent_index = parent(current_index);
+            if current_index == 0
+                || !self
+                    .comparator
+                    .favors(&self.values[current_index], &self.values[parent_index])
+            {
+                break;
+            }
+            changed_indices_scratch.push(current_index);
+            self.values.swap(parent_index, current_index);
+            current_index = parent_index;
+        }
         loop {
             let (left_child_index, right_child_index) = children(current_index);
             let favored_child_index = if right_child_index < self.values.len()
@@ -87,15 +100,15 @@ fn children(i: usize) -> (usize, usize) {
     (2 * i + 1, 2 * i + 2)
 }
 
-pub trait Comparator {
-    fn favors<T: Ord>(&self, lhs: &T, rhs: &T) -> bool;
+pub trait Comparator<T> {
+    fn favors(&self, lhs: &T, rhs: &T) -> bool;
 }
 
 #[derive(Default)]
 pub struct Min;
 
-impl Comparator for Min {
-    fn favors<T: Ord>(&self, lhs: &T, rhs: &T) -> bool {
+impl<T: PartialOrd> Comparator<T> for Min {
+    fn favors(&self, lhs: &T, rhs: &T) -> bool {
         lhs < rhs
     }
 }
@@ -103,8 +116,8 @@ impl Comparator for Min {
 #[derive(Default)]
 pub struct Max;
 
-impl Comparator for Max {
-    fn favors<T: Ord>(&self, lhs: &T, rhs: &T) -> bool {
+impl<T: PartialOrd> Comparator<T> for Max {
+    fn favors(&self, lhs: &T, rhs: &T) -> bool {
         lhs > rhs
     }
 }

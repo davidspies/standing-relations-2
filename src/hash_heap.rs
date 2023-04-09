@@ -61,7 +61,7 @@ impl<K, V, C: Default> Nullable for HashHeap<K, V, C> {
 pub type DrainIter<'a, K, V> =
     iter::Map<hash_map::Drain<'a, K, Entry<V>>, fn((K, Entry<V>)) -> (K, V)>;
 
-impl<K: Clone + Ord + Hash, V, C: Default + Comparator> IsMap<K, V> for HashHeap<K, V, C> {
+impl<K: Clone + Eq + Hash, V, C: Default + Comparator<K>> IsMap<K, V> for HashHeap<K, V, C> {
     type DrainIter<'a> = DrainIter<'a, K, V> where Self: 'a;
 
     fn len(&self) -> usize {
