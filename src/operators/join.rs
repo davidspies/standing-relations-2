@@ -2,8 +2,10 @@
 
 use std::hash::Hash;
 
+use generic_map::rollover_map::RolloverMap;
+
 use crate::{
-    context::CommitId, op::Op, relation::RelationInner, rollover_map::RolloverMap,
+    generic_map::AddMap, context::CommitId, op::Op, relation::RelationInner,
     value_count::ValueCount,
 };
 
@@ -43,13 +45,13 @@ where
             for (vr, &rcount) in self.right_values.get(&k).into_iter().flatten() {
                 f((k.clone(), vl.clone(), vr.clone()), lcount * rcount)
             }
-            self.left_values.add(k, (vl, lcount));
+            self.left_values.add((k, (vl, lcount)));
         });
         self.right_rel.foreach(current_id, |(k, vr), rcount| {
             for (vl, &lcount) in self.left_values.get(&k).into_iter().flatten() {
                 f((k.clone(), vl.clone(), vr.clone()), lcount * rcount)
             }
-            self.right_values.add(k, (vr, rcount));
+            self.right_values.add((k, (vr, rcount)));
         });
     }
 }

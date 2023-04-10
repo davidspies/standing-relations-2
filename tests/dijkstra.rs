@@ -1,6 +1,6 @@
 use std::{fmt::Debug, hash::Hash};
 
-use standing_relations_2::CreationContext;
+use standing_relations_2::{CreationContext, SingletonMap};
 
 fn dijkstra<Node: Debug + Eq + Hash + Clone>(
     start: Node,

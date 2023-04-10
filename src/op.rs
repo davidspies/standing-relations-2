@@ -3,9 +3,9 @@ use std::{
     sync::atomic::{self, AtomicUsize},
 };
 
-use crate::{
-    broadcast_channel, context::CommitId, rollover_map::RolloverMap, value_count::ValueCount,
-};
+use generic_map::rollover_map::RolloverMap;
+
+use crate::{generic_map::AddMap, broadcast_channel, context::CommitId, value_count::ValueCount};
 
 pub trait Op<T> {
     fn type_name(&self) -> &'static str;
@@ -19,7 +19,7 @@ pub trait Op<T> {
         T: Eq + Hash,
     {
         self.foreach(current_id, |x, v| {
-            map.add(x, v);
+            map.add((x, v));
             visit_count.fetch_add(1, atomic::Ordering::Relaxed);
         })
     }

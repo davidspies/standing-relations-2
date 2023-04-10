@@ -1,21 +1,23 @@
 use std::sync::Arc;
 
-use crate::{context::ContextId, relation::Relation, rollover_map::RolloverMap};
+use generic_map::rollover_map::RolloverMap;
+
+use crate::{context::ContextId, generic_map::AddMap, relation::Relation, value_count::ValueCount};
 
 use super::{data::RelationData, RelationInner};
 
 pub(crate) trait RelationArgs {
     type Inner;
 
-    fn add_context_ids(&self, s: &mut RolloverMap<ContextId, isize>);
+    fn add_context_ids(&self, s: &mut RolloverMap<ContextId, ValueCount>);
     fn push_datas(self, _v: &mut Vec<Arc<RelationData>>) -> Self::Inner;
 }
 
 impl RelationArgs for ContextId {
     type Inner = ();
 
-    fn add_context_ids(&self, s: &mut RolloverMap<ContextId, isize>) {
-        s.add(*self, 1);
+    fn add_context_ids(&self, s: &mut RolloverMap<ContextId, ValueCount>) {
+        s.add((*self, ValueCount(1)));
     }
     fn push_datas(self, _v: &mut Vec<Arc<RelationData>>) -> Self::Inner {}
 }
@@ -23,8 +25,8 @@ impl RelationArgs for ContextId {
 impl<T, C> RelationArgs for Relation<T, C> {
     type Inner = RelationInner<T, C>;
 
-    fn add_context_ids(&self, s: &mut RolloverMap<ContextId, isize>) {
-        s.add(self.context_id, 1);
+    fn add_context_ids(&self, s: &mut RolloverMap<ContextId, ValueCount>) {
+        s.add((self.context_id, ValueCount(1)));
     }
     fn push_datas(self, v: &mut Vec<Arc<RelationData>>) -> Self::Inner {
         v.push(Arc::new(self.data));
@@ -39,7 +41,7 @@ where
 {
     type Inner = (A::Inner, B::Inner);
 
-    fn add_context_ids(&self, s: &mut RolloverMap<ContextId, isize>) {
+    fn add_context_ids(&self, s: &mut RolloverMap<ContextId, ValueCount>) {
         let (a, b) = self;
         a.add_context_ids(s);
         b.add_context_ids(s);

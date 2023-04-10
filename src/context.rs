@@ -56,7 +56,7 @@ impl<'a> CreationContext<'a> {
         }
     }
     pub fn input<T: Eq + Hash + Clone + 'a>(&mut self) -> (Input<T>, Relation<T, InputOp<T>>) {
-        let (sender1, receiver1) = channel::new::<(T, isize)>();
+        let (sender1, receiver1) = channel::new::<(T, ValueCount)>();
         let (sender2, receiver2) = channel::new::<(T, ValueCount)>();
         self.input_pipes
             .push(Box::new(TrackedInputPipe::new(receiver1, sender2)));
@@ -66,7 +66,7 @@ impl<'a> CreationContext<'a> {
         )
     }
     pub fn frameless_input<T: 'a>(&mut self) -> (Input<T>, Relation<T, InputOp<T>>) {
-        let (sender1, receiver1) = channel::new::<(T, isize)>();
+        let (sender1, receiver1) = channel::new::<(T, ValueCount)>();
         let (sender2, receiver2) = channel::new::<(T, ValueCount)>();
         self.input_pipes
             .push(Box::new(UntrackedInputPipe::new(receiver1, sender2)));

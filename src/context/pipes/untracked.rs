@@ -7,12 +7,12 @@ use crate::{
 use super::{PipeT, ProcessResult};
 
 pub(crate) struct UntrackedInputPipe<T> {
-    receiver: channel::Receiver<(T, isize)>,
+    receiver: channel::Receiver<(T, ValueCount)>,
     sender: channel::Sender<(T, ValueCount)>,
 }
 impl<T> UntrackedInputPipe<T> {
     pub(crate) fn new(
-        receiver: channel::Receiver<(T, isize)>,
+        receiver: channel::Receiver<(T, ValueCount)>,
         sender: channel::Sender<(T, ValueCount)>,
     ) -> Self {
         UntrackedInputPipe { receiver, sender }

@@ -11,9 +11,12 @@ use std::{
     },
 };
 
+use generic_map::{rollover_map::RolloverMap, HashedMaxHeap, HashedMinHeap};
+
 use crate::{
     broadcast_channel,
     context::{CommitId, ContextId},
+    generic_map::SingletonMap,
     op::{DynOp, Op},
     operators::{
         antijoin::AntiJoin,
@@ -27,7 +30,6 @@ use crate::{
         save::Saved,
         split::{Split, SplitOp},
     },
-    rollover_map::{RolloverHashMaxHeap, RolloverHashMinHeap, RolloverMap},
     value_count::ValueCount,
 };
 
@@ -226,7 +228,7 @@ impl<T: Eq + Hash + Clone, C: Op<T>> Relation<T, C> {
         self.map_h(|t| (t, ()))
             .reduce(|_, vals| {
                 let ((), &count) = vals.get_singleton().unwrap();
-                count
+                count.0
             })
             .type_named("counts")
     }
@@ -304,9 +306,8 @@ where
         V: Clone + Ord,
     {
         Relation::from_op(self, |r| {
-            Reduce::new(r, |_: &K, vals: &RolloverHashMaxHeap<V, ValueCount>| {
-                let (v, _) = vals.max_key_value().unwrap();
-                v.clone()
+            Reduce::new(r, |_: &K, vals: &HashedMaxHeap<V, ValueCount>| {
+                vals.max_key().unwrap().clone()
             })
         })
         .type_named("maxes")
@@ -317,9 +318,8 @@ where
         V: Clone + Ord,
     {
         Relation::from_op(self, |r| {
-            Reduce::new(r, |_: &K, vals: &RolloverHashMinHeap<V, ValueCount>| {
-                let (v, _) = vals.min_key_value().unwrap();
-                v.clone()
+            Reduce::new(r, |_: &K, vals: &HashedMinHeap<V, ValueCount>| {
+                vals.min_key().unwrap().clone()
             })
         })
         .type_named("mins")

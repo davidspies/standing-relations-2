@@ -1,9 +1,8 @@
 use std::hash::Hash;
 
-use crate::{
-    context::CommitId, op::Op, relation::RelationInner, rollover_map::RolloverMap,
-    value_count::ValueCount,
-};
+use generic_map::rollover_map::RolloverMap;
+
+use crate::{context::CommitId, op::Op, relation::RelationInner, value_count::ValueCount};
 
 pub struct Consolidate<T, C> {
     sub_rel: RelationInner<T, C>,

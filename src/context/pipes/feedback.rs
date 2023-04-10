@@ -1,11 +1,13 @@
 use std::{collections::HashSet, hash::Hash};
 
+use generic_map::rollover_map::RolloverMap;
+
 use crate::{
+    generic_map::AddMap,
     context::{CommitId, Dropped},
     op::Op,
     operators::input::Input,
     relation::RelationInner,
-    rollover_map::RolloverMap,
     value_count::ValueCount,
 };
 
@@ -39,7 +41,7 @@ impl<T: Eq + Hash + Clone, C: Op<T>> PipeT for FeedbackPipe<T, C> {
         let mut result = ProcessResult::Unchanged;
         self.relation.dump_to_map(commit_id, &mut self.scratch_map);
         for (elem, count) in self.scratch_map.iter() {
-            self.tracked_map.add(elem.clone(), *count);
+            self.tracked_map.add((elem.clone(), *count));
         }
         for (elem, _) in self.scratch_map.drain() {
             if self.tracked_map.contains_key(&elem) && self.seen.insert(elem.clone()) {

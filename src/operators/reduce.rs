@@ -4,9 +4,11 @@ use std::{
     mem,
 };
 
+use generic_map::{GenericMap, RolloverMap};
+
 use crate::{
-    add_to_value::AddToValue, context::CommitId, nullable::Nullable, op::Op,
-    relation::RelationInner, rollover_map::RolloverMap, value_count::ValueCount,
+    context::CommitId, generic_map::AddMap, op::Op, relation::RelationInner,
+    value_count::ValueCount,
 };
 
 pub struct Reduce<K, V, Y, G, M, C> {
@@ -35,8 +37,7 @@ where
     V: Eq + Hash,
     Y: Eq + Clone,
     G: Fn(&K, &M) -> Y,
-    M: Nullable,
-    (V, ValueCount): AddToValue<M>,
+    M: GenericMap<K = V, V = ValueCount> + AddMap<(V, ValueCount)>,
     C: Op<(K, V)>,
 {
     fn type_name(&self) -> &'static str {
@@ -44,14 +45,14 @@ where
     }
     fn foreach<F: FnMut((K, Y), ValueCount)>(&mut self, current_id: CommitId, mut f: F) {
         self.sub_rel.foreach(current_id, |(k, v), count| {
-            self.aggregated_values.add(k.clone(), (v, count));
+            self.aggregated_values.add((k.clone(), (v, count)));
             self.changed_keys_scratch.insert(k);
         });
         for k in self.changed_keys_scratch.drain() {
             match self.aggregated_values.get(&k) {
                 None => {
                     if let Some(y) = self.outputs.remove(&k) {
-                        f((k, y), -1)
+                        f((k, y), ValueCount(-1))
                     }
                 }
                 Some(vals) => {
@@ -59,14 +60,14 @@ where
                     match self.outputs.entry(k.clone()) {
                         hash_map::Entry::Vacant(vac) => {
                             vac.insert(new_y.clone());
-                            f((k, new_y), 1);
+                            f((k, new_y), ValueCount(1));
                         }
                         hash_map::Entry::Occupied(mut occ) => {
                             let out = occ.get_mut();
                             if new_y != *out {
                                 let old_y = mem::replace(out, new_y.clone());
-                                f((k.clone(), old_y), -1);
-                                f((k, new_y), 1);
+                                f((k.clone(), old_y), ValueCount(-1));
+                                f((k, new_y), ValueCount(1));
                             }
                         }
                     }

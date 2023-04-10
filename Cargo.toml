@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 arrayvec = "*"
 derivative = "*"
+generic_map.path = "../generic_map"
 index_list = "*"
 slice-group-by = "*"
 uuid = { version = "*", features = ["v4"] }

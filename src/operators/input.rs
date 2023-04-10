@@ -12,22 +12,26 @@ use crate::{
 #[derivative(Clone(bound = ""))]
 pub struct Input<T> {
     pub(crate) context_id: ContextId,
-    sender: Sender<(T, isize)>,
+    sender: Sender<(T, ValueCount)>,
 }
 
 pub type InputRelation<T> = Relation<T, InputOp<T>>;
 
 impl<T> Input<T> {
-    pub(crate) fn new(context_id: ContextId, sender: Sender<(T, isize)>) -> Self {
+    pub(crate) fn new(context_id: ContextId, sender: Sender<(T, ValueCount)>) -> Self {
         Self { context_id, sender }
     }
 
     pub fn send(&mut self, elem: T) -> Result<(), T> {
-        self.sender.send((elem, 1)).map_err(|(elem, _)| elem)
+        self.sender
+            .send((elem, ValueCount(1)))
+            .map_err(|(elem, _)| elem)
     }
 
     pub fn unsend(&mut self, elem: T) -> Result<(), T> {
-        self.sender.send((elem, -1)).map_err(|(elem, _)| elem)
+        self.sender
+            .send((elem, ValueCount(-1)))
+            .map_err(|(elem, _)| elem)
     }
 }
 

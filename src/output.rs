@@ -4,12 +4,13 @@ use std::{
     rc::Rc,
 };
 
+use generic_map::rollover_map::RolloverMap;
+
 use crate::{
     context::CommitId,
     op::{DynOp, Op},
     operators::save::SavedOp,
     relation::RelationInner,
-    rollover_map::RolloverMap,
     value_count::ValueCount,
 };
 

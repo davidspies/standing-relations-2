@@ -1,8 +1,10 @@
 use std::hash::Hash;
 
+use generic_map::rollover_map::RolloverMap;
+
 use crate::{
-    add_to_value::ValueChanges, context::CommitId, op::Op, relation::RelationInner,
-    rollover_map::RolloverMap, value_count::ValueCount,
+    context::CommitId, generic_map::AddMap, op::Op, relation::RelationInner,
+    value_count::ValueCount,
 };
 
 pub struct AntiJoin<K, V, CL, CR> {
@@ -37,38 +39,28 @@ where
     }
     fn foreach<F: FnMut((K, V), ValueCount)>(&mut self, current_id: CommitId, mut f: F) {
         self.right_rel.foreach(current_id, |k, count| {
-            match self.right_values.add(k.clone(), count) {
-                ValueChanges {
-                    was_zero: true,
-                    is_zero: false,
-                } => {
-                    for (v, &lcount) in self.left_values.get(&k).into_iter().flatten() {
-                        f((k.clone(), v.clone()), -lcount)
+            let was_zero = !self.right_values.contains_key(&k);
+            self.right_values.add((k.clone(), count));
+            let is_zero = !self.right_values.contains_key(&k);
+            if was_zero && !is_zero {
+                if let Some(left_vals) = self.left_values.get(&k) {
+                    for (v, count) in left_vals.iter() {
+                        f((k.clone(), v.clone()), -*count);
                     }
                 }
-                ValueChanges {
-                    was_zero: false,
-                    is_zero: true,
-                } => {
-                    for (v, &lcount) in self.left_values.get(&k).into_iter().flatten() {
-                        f((k.clone(), v.clone()), lcount)
+            } else if !was_zero && is_zero {
+                if let Some(left_vals) = self.left_values.get(&k) {
+                    for (v, count) in left_vals.iter() {
+                        f((k.clone(), v.clone()), *count);
                     }
                 }
-                ValueChanges {
-                    was_zero: true,
-                    is_zero: true,
-                } => panic!("zero count"),
-                ValueChanges {
-                    was_zero: false,
-                    is_zero: false,
-                } => (),
             }
         });
         self.left_rel.foreach(current_id, |(k, v), count| {
             if !self.right_values.contains_key(&k) {
                 f((k.clone(), v.clone()), count);
             }
-            self.left_values.add(k, (v, count));
+            self.left_values.add((k, (v, count)));
         })
     }
 }

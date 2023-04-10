@@ -1,10 +1,11 @@
 use std::hash::Hash;
 
+use generic_map::rollover_map::RolloverMap;
+
 use crate::{
     context::{CommitId, Dropped},
     op::Op,
     relation::RelationInner,
-    rollover_map::RolloverMap,
     value_count::ValueCount,
 };
 
