@@ -3,7 +3,7 @@ use std::{collections::HashMap, hash::Hash};
 use generic_map::rollover_map::RolloverMap;
 
 use crate::{
-    context::CommitId, generic_map::AddMap, nullable::Nullable, op::Op, relation::RelationInner,
+    context::CommitId, generic_map::AddMap, op::Op, relation::RelationInner,
     value_count::ValueCount,
 };
 
@@ -29,9 +29,9 @@ impl<T: Clone + Eq + Hash, C: Op<T>> Op<T> for Distinct<T, C> {
     }
     fn foreach<F: FnMut(T, ValueCount)>(&mut self, current_id: CommitId, mut f: F) {
         self.sub_rel.foreach(current_id, |value, count| {
-            let was_zero = count.is_empty();
+            let was_zero = !self.current_counts.contains_key(&value);
             self.current_counts.add((value.clone(), count));
-            let is_zero = self.current_counts.get(&value).unwrap().is_empty();
+            let is_zero = !self.current_counts.contains_key(&value);
             if was_zero && !is_zero {
                 self.changed_scratch.entry(value).or_default().add();
             } else if !was_zero && is_zero {
