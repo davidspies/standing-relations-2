@@ -4,7 +4,7 @@ use generic_map::clear::Clear;
 
 use crate::nullable::Nullable;
 
-#[derive(Default, Clone, Copy, Debug)]
+#[derive(Default, Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ValueCount(pub isize);
 
 impl Clear for ValueCount {

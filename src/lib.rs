@@ -6,6 +6,7 @@ pub use self::operators::{
 };
 pub use self::output::{Output, SavedOutput};
 pub use self::relation::Relation;
+pub use self::value_count::ValueCount;
 
 mod arc_key;
 mod broadcast_channel;
