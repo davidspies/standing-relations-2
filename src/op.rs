@@ -1,13 +1,17 @@
 use std::{collections::HashMap, hash::Hash};
 
 use crate::{
-    broadcast_channel, context::CommitId, entry::Entry, generic_map::AddMap,
-    relation::RelationInfo, value_count::ValueCount,
+    broadcast_channel,
+    context::{CommitId, Ids},
+    entry::Entry,
+    generic_map::AddMap,
+    relation::RelationInfo,
+    value_count::ValueCount,
 };
 
 pub trait Op<T> {
     fn type_name(&self) -> &'static str;
-    fn foreach<F: FnMut(T, ValueCount)>(&mut self, current_id: CommitId, f: F);
+    fn foreach<F: FnMut(T, Ids, ValueCount)>(&mut self, current_id: CommitId, f: F);
     fn dump_to_map(
         &mut self,
         current_id: CommitId,
@@ -16,9 +20,9 @@ pub trait Op<T> {
     ) where
         T: Eq + Hash,
     {
-        self.foreach(current_id, |x, v| {
+        self.foreach(current_id, |x, ids, v| {
             map.add((x, v));
-            info.visit()
+            info.visit(ids)
         })
     }
     fn dump_to_vec(
@@ -27,22 +31,22 @@ pub trait Op<T> {
         info: &mut RelationInfo,
         vec: &mut Vec<Entry<T>>,
     ) {
-        self.foreach(current_id, |x, v| {
-            vec.push(Entry::new(x, v));
-            info.visit()
+        self.foreach(current_id, |x, ids, v| {
+            vec.push(Entry::new(x, ids, v));
+            info.visit(ids)
         })
     }
     fn send_to_broadcast(
         &mut self,
         current_id: CommitId,
         info: &mut RelationInfo,
-        broadcast: &mut broadcast_channel::Sender<(T, ValueCount)>,
+        broadcast: &mut broadcast_channel::Sender<(T, Ids, ValueCount)>,
     ) where
         T: Clone,
     {
-        self.foreach(current_id, |x, v| {
-            broadcast.send(&(x.clone(), v));
-            info.visit()
+        self.foreach(current_id, |x, ids, v| {
+            broadcast.send(&(x.clone(), ids, v));
+            info.visit(ids)
         })
     }
 }
@@ -51,7 +55,7 @@ impl<T, C: Op<T> + ?Sized> Op<T> for Box<C> {
     fn type_name(&self) -> &'static str {
         self.as_ref().type_name()
     }
-    fn foreach<F: FnMut(T, ValueCount)>(&mut self, current_id: CommitId, f: F) {
+    fn foreach<F: FnMut(T, Ids, ValueCount)>(&mut self, current_id: CommitId, f: F) {
         self.as_mut().foreach(current_id, f)
     }
     fn dump_to_map(
@@ -76,7 +80,7 @@ impl<T, C: Op<T> + ?Sized> Op<T> for Box<C> {
         &mut self,
         current_id: CommitId,
         info: &mut RelationInfo,
-        broadcast: &mut broadcast_channel::Sender<(T, ValueCount)>,
+        broadcast: &mut broadcast_channel::Sender<(T, Ids, ValueCount)>,
     ) where
         T: Clone,
     {
@@ -86,7 +90,7 @@ impl<T, C: Op<T> + ?Sized> Op<T> for Box<C> {
 
 pub trait DynOp<T> {
     fn type_name(&self) -> &'static str;
-    fn foreach(&mut self, current_id: CommitId, f: &mut dyn FnMut(T, ValueCount));
+    fn foreach(&mut self, current_id: CommitId, f: &mut dyn FnMut(T, Ids, ValueCount));
     fn dump_to_map(
         &mut self,
         current_id: CommitId,
@@ -104,7 +108,7 @@ pub trait DynOp<T> {
         &mut self,
         current_id: CommitId,
         info: &mut RelationInfo,
-        broadcast: &mut broadcast_channel::Sender<(T, ValueCount)>,
+        broadcast: &mut broadcast_channel::Sender<(T, Ids, ValueCount)>,
     ) where
         T: Clone;
 }
@@ -113,7 +117,7 @@ impl<T, C: Op<T>> DynOp<T> for C {
     fn type_name(&self) -> &'static str {
         Op::type_name(self)
     }
-    fn foreach(&mut self, current_id: CommitId, f: &mut dyn FnMut(T, ValueCount)) {
+    fn foreach(&mut self, current_id: CommitId, f: &mut dyn FnMut(T, Ids, ValueCount)) {
         Op::foreach(self, current_id, f)
     }
     fn dump_to_map(
@@ -138,7 +142,7 @@ impl<T, C: Op<T>> DynOp<T> for C {
         &mut self,
         current_id: CommitId,
         info: &mut RelationInfo,
-        broadcast: &mut broadcast_channel::Sender<(T, ValueCount)>,
+        broadcast: &mut broadcast_channel::Sender<(T, Ids, ValueCount)>,
     ) where
         T: Clone,
     {
@@ -150,7 +154,7 @@ impl<T> Op<T> for dyn DynOp<T> + '_ {
     fn type_name(&self) -> &'static str {
         DynOp::type_name(self)
     }
-    fn foreach<F: FnMut(T, ValueCount)>(&mut self, current_id: CommitId, mut f: F) {
+    fn foreach<F: FnMut(T, Ids, ValueCount)>(&mut self, current_id: CommitId, mut f: F) {
         DynOp::foreach(self, current_id, &mut f)
     }
     fn dump_to_map(
@@ -175,7 +179,7 @@ impl<T> Op<T> for dyn DynOp<T> + '_ {
         &mut self,
         current_id: CommitId,
         info: &mut RelationInfo,
-        broadcast: &mut broadcast_channel::Sender<(T, ValueCount)>,
+        broadcast: &mut broadcast_channel::Sender<(T, Ids, ValueCount)>,
     ) where
         T: Clone,
     {

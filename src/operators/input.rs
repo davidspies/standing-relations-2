@@ -2,7 +2,7 @@ use derivative::Derivative;
 
 use crate::{
     channel::{Receiver, Sender},
-    context::{CommitId, ContextId},
+    context::{CommitId, ContextId, Ids},
     op::Op,
     relation::Relation,
     value_count::ValueCount,
@@ -35,10 +35,10 @@ impl<T> Input<T> {
     }
 }
 
-pub struct InputOp<T>(Receiver<(T, ValueCount)>);
+pub struct InputOp<T>(Receiver<(T, Ids, ValueCount)>);
 
 impl<T> InputOp<T> {
-    pub(crate) fn new(receiver: Receiver<(T, ValueCount)>) -> Self {
+    pub(crate) fn new(receiver: Receiver<(T, Ids, ValueCount)>) -> Self {
         Self(receiver)
     }
 }
@@ -47,9 +47,9 @@ impl<T> Op<T> for InputOp<T> {
     fn type_name(&self) -> &'static str {
         "input"
     }
-    fn foreach<F: FnMut(T, ValueCount)>(&mut self, _current_id: CommitId, mut f: F) {
-        while let Some((value, count)) = self.0.try_recv() {
-            f(value, count)
+    fn foreach<F: FnMut(T, Ids, ValueCount)>(&mut self, _current_id: CommitId, mut f: F) {
+        while let Some((value, ids, count)) = self.0.try_recv() {
+            f(value, ids, count)
         }
     }
 }

@@ -2,7 +2,7 @@ use std::{cell::RefCell, rc::Rc};
 
 use crate::{
     channel::{self, Receiver, Sender},
-    context::CommitId,
+    context::{CommitId, Ids},
     op::Op,
     relation::RelationInner,
     value_count::ValueCount,
@@ -11,8 +11,8 @@ use crate::{
 struct SplitInner<L, R, C> {
     last_id: CommitId,
     sub_rel: RelationInner<(L, R), C>,
-    left_sender: Sender<(L, ValueCount)>,
-    right_sender: Sender<(R, ValueCount)>,
+    left_sender: Sender<(L, Ids, ValueCount)>,
+    right_sender: Sender<(R, Ids, ValueCount)>,
 }
 
 pub(crate) struct Split<L, R, C> {
@@ -45,14 +45,14 @@ impl<L, R, C> Split<L, R, C> {
 
 pub struct SplitOp<T, L, R, C> {
     inner: Rc<RefCell<SplitInner<L, R, C>>>,
-    receiver: Receiver<(T, ValueCount)>,
+    receiver: Receiver<(T, Ids, ValueCount)>,
 }
 
 impl<T, L, R, C: Op<(L, R)>> Op<T> for SplitOp<T, L, R, C> {
     fn type_name(&self) -> &'static str {
         "split"
     }
-    fn foreach<F: FnMut(T, ValueCount)>(&mut self, current_id: CommitId, mut f: F) {
+    fn foreach<F: FnMut(T, Ids, ValueCount)>(&mut self, current_id: CommitId, mut f: F) {
         let mut inner = self.inner.borrow_mut();
         let SplitInner {
             sub_rel,
@@ -61,14 +61,14 @@ impl<T, L, R, C: Op<(L, R)>> Op<T> for SplitOp<T, L, R, C> {
             last_id,
         } = &mut *inner;
         if *last_id < current_id {
-            sub_rel.foreach(current_id, |(l, r), count| {
-                let _ = left_sender.send((l, count));
-                let _ = right_sender.send((r, count));
+            sub_rel.foreach(current_id, |(l, r), ids, count| {
+                let _ = left_sender.send((l, ids, count));
+                let _ = right_sender.send((r, ids, count));
             });
             *last_id = current_id
         }
-        while let Some((t, count)) = self.receiver.try_recv() {
-            f(t, count)
+        while let Some((t, ids, count)) = self.receiver.try_recv() {
+            f(t, ids, count)
         }
     }
 }

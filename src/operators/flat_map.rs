@@ -1,4 +1,9 @@
-use crate::{context::CommitId, op::Op, relation::RelationInner, value_count::ValueCount};
+use crate::{
+    context::{CommitId, Ids},
+    op::Op,
+    relation::RelationInner,
+    value_count::ValueCount,
+};
 
 pub struct FlatMap<S, G, C> {
     sub_rel: RelationInner<S, C>,
@@ -20,10 +25,10 @@ where
     fn type_name(&self) -> &'static str {
         "flat_map"
     }
-    fn foreach<F: FnMut(T, ValueCount)>(&mut self, current_id: CommitId, mut f: F) {
-        self.sub_rel.foreach(current_id, |x, count| {
+    fn foreach<F: FnMut(T, Ids, ValueCount)>(&mut self, current_id: CommitId, mut f: F) {
+        self.sub_rel.foreach(current_id, |x, ids, count| {
             for y in (self.g)(x) {
-                f(y, count)
+                f(y, ids, count)
             }
         })
     }

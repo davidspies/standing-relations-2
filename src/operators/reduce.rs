@@ -7,7 +7,11 @@ use std::{
 use generic_map::{GenericMap, RolloverMap};
 
 use crate::{
-    context::CommitId, entry::Entry, generic_map::AddMap, op::Op, relation::RelationInner,
+    context::{CommitId, Ids},
+    entry::Entry,
+    generic_map::AddMap,
+    op::Op,
+    relation::RelationInner,
     value_count::ValueCount,
 };
 
@@ -45,37 +49,42 @@ where
     fn type_name(&self) -> &'static str {
         "reduce"
     }
-    fn foreach<F: FnMut((K, Y), ValueCount)>(&mut self, current_id: CommitId, mut f: F) {
+    fn foreach<F: FnMut((K, Y), Ids, ValueCount)>(&mut self, current_id: CommitId, mut f: F) {
         self.sub_rel
             .dump_to_vec(current_id, &mut self.encountered_changes_scratch);
-        for e in self.encountered_changes_scratch.drain(..) {
-            let Entry {
-                value: (k, v),
-                value_count,
-            } = e;
-            self.changed_keys_scratch.insert(k.clone());
-            self.aggregated_values.add((k, (v, value_count)));
-        }
-        for k in self.changed_keys_scratch.drain() {
-            match self.aggregated_values.get(&k) {
-                None => {
-                    if let Some(y) = self.outputs.remove(&k) {
-                        f((k, y), ValueCount(-1))
-                    }
-                }
-                Some(vals) => {
-                    let new_y = (self.g)(&k, vals);
-                    match self.outputs.entry(k.clone()) {
-                        hash_map::Entry::Vacant(vac) => {
-                            vac.insert(new_y.clone());
-                            f((k, new_y), ValueCount(1));
+        let mut iter = self.encountered_changes_scratch.drain(..).peekable();
+        while let Some(e) = iter.peek() {
+            let ids = e.ids;
+            while iter.peek().map(|e| e.ids) == Some(ids) {
+                let Entry {
+                    value: (k, v),
+                    ids: _,
+                    value_count,
+                } = iter.next().unwrap();
+                self.changed_keys_scratch.insert(k.clone());
+                self.aggregated_values.add((k, (v, value_count)));
+            }
+            for k in self.changed_keys_scratch.drain() {
+                match self.aggregated_values.get(&k) {
+                    None => {
+                        if let Some(y) = self.outputs.remove(&k) {
+                            f((k, y), ids, ValueCount(-1))
                         }
-                        hash_map::Entry::Occupied(mut occ) => {
-                            let out = occ.get_mut();
-                            if new_y != *out {
-                                let old_y = mem::replace(out, new_y.clone());
-                                f((k.clone(), old_y), ValueCount(-1));
-                                f((k, new_y), ValueCount(1));
+                    }
+                    Some(vals) => {
+                        let new_y = (self.g)(&k, vals);
+                        match self.outputs.entry(k.clone()) {
+                            hash_map::Entry::Vacant(vac) => {
+                                vac.insert(new_y.clone());
+                                f((k, new_y), ids, ValueCount(1));
+                            }
+                            hash_map::Entry::Occupied(mut occ) => {
+                                let out = occ.get_mut();
+                                if new_y != *out {
+                                    let old_y = mem::replace(out, new_y.clone());
+                                    f((k.clone(), old_y), ids, ValueCount(-1));
+                                    f((k, new_y), ids, ValueCount(1));
+                                }
                             }
                         }
                     }

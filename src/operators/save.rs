@@ -2,7 +2,7 @@ use std::{cell::RefCell, hash::Hash, rc::Rc, sync::Arc};
 
 use crate::{
     broadcast_channel::{Receiver, Sender},
-    context::{CommitId, ContextId},
+    context::{CommitId, ContextId, Ids},
     op::{DynOp, Op},
     relation::{data::RelationData, Relation, RelationInner},
     value_count::ValueCount,
@@ -13,7 +13,7 @@ struct SavedInner<T, C> {
     data: Arc<RelationData>,
     last_id: CommitId,
     sub_rel: RelationInner<T, C>,
-    sender: Sender<(T, ValueCount)>,
+    sender: Sender<(T, Ids, ValueCount)>,
 }
 
 pub struct Saved<T, C = Box<dyn DynOp<T>>>(Rc<RefCell<SavedInner<T, C>>>);
@@ -33,7 +33,7 @@ impl<T, C> Saved<T, C> {
 
 pub struct SavedOp<T, C> {
     inner: Rc<RefCell<SavedInner<T, C>>>,
-    receiver: Receiver<(T, ValueCount)>,
+    receiver: Receiver<(T, Ids, ValueCount)>,
 }
 
 impl<T: Clone, C: Op<T>> Saved<T, C> {
@@ -72,7 +72,7 @@ impl<T: Clone, C: Op<T>> Op<T> for SavedOp<T, C> {
     fn type_name(&self) -> &'static str {
         "save"
     }
-    fn foreach<F: FnMut(T, ValueCount)>(&mut self, current_id: CommitId, mut f: F) {
+    fn foreach<F: FnMut(T, Ids, ValueCount)>(&mut self, current_id: CommitId, mut f: F) {
         let mut inner = self.inner.borrow_mut();
         let SavedInner {
             context_id: _,
@@ -85,8 +85,8 @@ impl<T: Clone, C: Op<T>> Op<T> for SavedOp<T, C> {
             sub_rel.send_to_broadcast(current_id, sender);
             *last_id = current_id
         }
-        while let Some((t, count)) = self.receiver.try_recv() {
-            f(t, count)
+        while let Some((t, ids, count)) = self.receiver.try_recv() {
+            f(t, ids, count)
         }
     }
 }
