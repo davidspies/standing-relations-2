@@ -23,7 +23,7 @@ impl<T, C: Op<T>> Processable for FeedbackPipe<T, C> {
     fn process(&mut self, commit_id: CommitId) -> Result<ProcessResult, Dropped> {
         let mut any_dropped = false;
         let mut result = ProcessResult::Unchanged;
-        self.relation.foreach(commit_id, |value, count| {
+        self.relation.foreach(commit_id, |value, _ids, count| {
             if self.input.send_count(value, Who::Feedback(count)).is_err() {
                 any_dropped = true;
             }

@@ -20,7 +20,7 @@ use generic_map::{
 
 use crate::{
     broadcast_channel,
-    context::{CommitId, ContextId},
+    context::{CommitId, ContextId, Ids},
     entry::Entry,
     generic_map::SingletonMap,
     nullable::Nullable,
@@ -52,10 +52,13 @@ pub struct Relation<T, C = Box<dyn DynOp<T>>> {
 
 pub struct RelationInfo {
     visit_count: Arc<AtomicUsize>,
+    prev_ids: Option<Ids>,
 }
 
 impl RelationInfo {
-    pub(crate) fn visit(&mut self) {
+    pub(crate) fn visit(&mut self, ids: Ids) {
+        assert!(Some(ids) >= self.prev_ids);
+        self.prev_ids = Some(ids);
         self.visit_count.fetch_add(1, atomic::Ordering::Relaxed);
     }
 }
@@ -67,14 +70,17 @@ pub(crate) struct RelationInner<T, C> {
 }
 
 impl<T, C: Op<T>> RelationInner<T, C> {
-    pub(crate) fn foreach(&mut self, current_id: CommitId, mut f: impl FnMut(T, ValueCount)) {
-        self.operator.foreach(current_id, |x, v| f(x, v))
+    pub(crate) fn foreach(&mut self, current_id: CommitId, mut f: impl FnMut(T, Ids, ValueCount)) {
+        self.operator.foreach(current_id, |x, ids, v| {
+            self.info.visit(ids);
+            f(x, ids, v)
+        })
     }
 
     pub(crate) fn send_to_broadcast(
         &mut self,
         current_id: CommitId,
-        broadcast: &mut broadcast_channel::Sender<(T, ValueCount)>,
+        broadcast: &mut broadcast_channel::Sender<(T, Ids, ValueCount)>,
     ) where
         T: Clone,
     {
@@ -102,6 +108,7 @@ impl<T, C> Relation<T, C> {
                 phantom: PhantomData,
                 info: RelationInfo {
                     visit_count: data.visit_count.clone(),
+                    prev_ids: None,
                 },
                 operator,
             },

@@ -1,4 +1,5 @@
 use std::cell::Cell;
+use std::cmp::Reverse;
 use std::collections::HashSet;
 #[cfg(feature = "redis")]
 use std::fmt::Debug;
@@ -37,6 +38,35 @@ pub(crate) struct ContextId(Uuid);
 #[derive(PartialEq, Eq, Hash, Clone, Copy, Debug, Default, PartialOrd, Ord)]
 pub struct CommitId(usize);
 
+#[derive(PartialEq, Eq, Hash, Clone, Copy, Debug, Default, PartialOrd, Ord)]
+pub struct DataId(usize);
+
+#[derive(PartialEq, Eq, Hash, Clone, Copy, Debug, Default, PartialOrd, Ord)]
+pub struct Ids {
+    commit_id: CommitId,
+    data_id: Reverse<DataId>,
+}
+
+impl Ids {
+    pub fn new(commit_id: CommitId, data_id: DataId) -> Self {
+        Self {
+            commit_id,
+            data_id: Reverse(data_id),
+        }
+    }
+
+    pub fn data_id(&self) -> DataId {
+        self.data_id.0
+    }
+
+    fn processed(commit_id: CommitId) -> Ids {
+        Self {
+            commit_id,
+            data_id: Reverse(DataId(commit_id.0)),
+        }
+    }
+}
+
 pub struct CreationContext<'a> {
     id: ContextId,
     commit_id: Rc<Cell<CommitId>>,
@@ -74,7 +104,7 @@ impl<'a> CreationContext<'a> {
     }
     pub fn input<T: Eq + Hash + Clone + 'a>(&mut self) -> (Input<T>, Relation<T, InputOp<T>>) {
         let (sender1, receiver1) = channel::new::<(T, Who)>();
-        let (sender2, receiver2) = channel::new::<(T, ValueCount)>();
+        let (sender2, receiver2) = channel::new::<(T, Ids, ValueCount)>();
         self.input_pipes
             .push(Box::new(TrackedInputPipe::new(receiver1, sender2)));
         (
@@ -86,7 +116,7 @@ impl<'a> CreationContext<'a> {
         &mut self,
     ) -> (Input<T>, Relation<T, InputOp<T>>) {
         let (sender1, receiver1) = channel::new::<(T, Who)>();
-        let (sender2, receiver2) = channel::new::<(T, ValueCount)>();
+        let (sender2, receiver2) = channel::new::<(T, Ids, ValueCount)>();
         self.input_pipes
             .push(Box::new(UntrackedInputPipe::new(receiver1, sender2)));
         (
