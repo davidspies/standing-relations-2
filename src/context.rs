@@ -17,13 +17,14 @@ use crate::{
     output::Output,
     relation::{data::RelationData, Relation},
     value_count::ValueCount,
+    who::Who,
 };
 
 #[cfg(feature = "redis")]
 use self::pipes::redis::RedisPipe;
 use self::pipes::{
     feedback::FeedbackPipe, interrupt::Interrupt, tracked::TrackedInputPipe,
-    untracked::UntrackedInputPipe, PipeT, ProcessResult,
+    untracked::UntrackedInputPipe, PipeT, ProcessResult, Processable,
 };
 
 pub use self::pipes::interrupt::InterruptId;
@@ -40,7 +41,7 @@ pub struct CreationContext<'a> {
     id: ContextId,
     commit_id: Rc<Cell<CommitId>>,
     input_pipes: Vec<Box<dyn PipeT + 'a>>,
-    feedback_pipes: IndexList<Box<dyn PipeT + 'a>>,
+    feedback_pipes: IndexList<Box<dyn Processable + 'a>>,
     relational_graph: HashSet<ArcKey<RelationData>>,
     #[cfg(feature = "redis")]
     redis: Option<redis::Client>,
@@ -72,7 +73,7 @@ impl<'a> CreationContext<'a> {
         }
     }
     pub fn input<T: Eq + Hash + Clone + 'a>(&mut self) -> (Input<T>, Relation<T, InputOp<T>>) {
-        let (sender1, receiver1) = channel::new::<(T, ValueCount)>();
+        let (sender1, receiver1) = channel::new::<(T, Who)>();
         let (sender2, receiver2) = channel::new::<(T, ValueCount)>();
         self.input_pipes
             .push(Box::new(TrackedInputPipe::new(receiver1, sender2)));
@@ -81,8 +82,10 @@ impl<'a> CreationContext<'a> {
             Relation::from_op(self.id, move |()| InputOp::new(receiver2)),
         )
     }
-    pub fn frameless_input<T: 'a>(&mut self) -> (Input<T>, Relation<T, InputOp<T>>) {
-        let (sender1, receiver1) = channel::new::<(T, ValueCount)>();
+    pub fn frameless_input<T: Eq + Hash + Clone + 'a>(
+        &mut self,
+    ) -> (Input<T>, Relation<T, InputOp<T>>) {
+        let (sender1, receiver1) = channel::new::<(T, Who)>();
         let (sender2, receiver2) = channel::new::<(T, ValueCount)>();
         self.input_pipes
             .push(Box::new(UntrackedInputPipe::new(receiver1, sender2)));
@@ -158,7 +161,7 @@ impl<'a> CreationContext<'a> {
 pub struct ExecutionContext<'a> {
     commit_id: Rc<Cell<CommitId>>,
     input_pipes: Vec<Box<dyn PipeT + 'a>>,
-    feedback_pipes: IndexList<Box<dyn PipeT + 'a>>,
+    feedback_pipes: IndexList<Box<dyn Processable + 'a>>,
 }
 
 impl ExecutionContext<'_> {
@@ -191,13 +194,6 @@ impl ExecutionContext<'_> {
     pub fn with_frame<R>(&mut self, f: impl FnOnce(&mut Self) -> R) -> R {
         self.one_pass();
 
-        let mut i = self.feedback_pipes.first_index();
-        while i.is_some() {
-            let next_i = self.feedback_pipes.next_index(i);
-            self.feedback_pipes.get_mut(i).unwrap().push_frame();
-            i = next_i;
-        }
-
         for input in self.input_pipes.iter_mut() {
             input.push_frame();
         }
@@ -207,22 +203,26 @@ impl ExecutionContext<'_> {
         self.input_pipes
             .retain_mut(|input| input.pop_frame(self.commit_id.get()).is_ok());
 
+        self.commit_id.set(CommitId(self.commit_id.get().0 + 1));
         let mut i = self.feedback_pipes.first_index();
         while i.is_some() {
             let next_i = self.feedback_pipes.next_index(i);
-            if self
+            match self
                 .feedback_pipes
                 .get_mut(i)
                 .unwrap()
-                .pop_frame(self.commit_id.get())
-                .is_err()
+                .process(self.commit_id.get())
             {
-                self.feedback_pipes.remove(i);
+                Ok(_) => {}
+                Err(Dropped) => {
+                    self.feedback_pipes.remove(i);
+                }
             }
             i = next_i;
         }
+        self.input_pipes
+            .retain_mut(|pipe| pipe.process(self.commit_id.get()).is_ok());
 
-        self.one_pass();
         result
     }
 

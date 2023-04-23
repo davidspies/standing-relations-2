@@ -7,7 +7,7 @@ use crate::{
     value_count::ValueCount,
 };
 
-use super::{PipeT, ProcessResult};
+use super::{ProcessResult, Processable};
 
 pub type InterruptId = usize;
 
@@ -27,7 +27,7 @@ impl<T, C> Interrupt<T, C> {
     }
 }
 
-impl<T: Eq + Hash, C: Op<T>> PipeT for Interrupt<T, C> {
+impl<T: Eq + Hash, C: Op<T>> Processable for Interrupt<T, C> {
     fn process(&mut self, commit_id: CommitId) -> Result<ProcessResult, Dropped> {
         self.relation.dump_to_map(commit_id, &mut self.values);
         if self.values.is_empty() {
@@ -35,9 +35,5 @@ impl<T: Eq + Hash, C: Op<T>> PipeT for Interrupt<T, C> {
         } else {
             Ok(ProcessResult::Interrupted(self.interrupt_id))
         }
-    }
-    fn push_frame(&mut self) {}
-    fn pop_frame(&mut self, _commit_id: CommitId) -> Result<(), Dropped> {
-        Ok(())
     }
 }

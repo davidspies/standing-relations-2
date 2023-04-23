@@ -12,7 +12,7 @@ use crate::{
     ValueCount,
 };
 
-use super::{PipeT, ProcessResult};
+use super::{ProcessResult, Processable};
 
 impl<T: Debug, C> Drop for RedisPipe<T, C> {
     fn drop(&mut self) {
@@ -46,7 +46,7 @@ impl<T: Debug, C> RedisPipe<T, C> {
     }
 }
 
-impl<T: Clone + Eq + Hash + Debug, C: Op<T>> PipeT for RedisPipe<T, C> {
+impl<T: Clone + Eq + Hash + Debug, C: Op<T>> Processable for RedisPipe<T, C> {
     fn process(&mut self, commit_id: CommitId) -> Result<ProcessResult, Dropped> {
         self.relation
             .dump_to_map(commit_id, &mut self.changed_values_scratch);
@@ -62,12 +62,6 @@ impl<T: Clone + Eq + Hash + Debug, C: Op<T>> PipeT for RedisPipe<T, C> {
             }
         }
         Ok(ProcessResult::Unchanged)
-    }
-    fn push_frame(&mut self) {
-        ()
-    }
-    fn pop_frame(&mut self, _commit_id: CommitId) -> Result<(), Dropped> {
-        Ok(())
     }
 }
 
