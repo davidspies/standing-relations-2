@@ -17,10 +17,8 @@ fn dijkstra<Node: Debug + Ord + Hash + Clone>(
     let edges_rel = edges_rel.named("edges");
 
     let (distances_input, distances) = context.input::<(Node, usize)>();
-    let distances = distances
-        .concat(start_rel.map(|n| (n, 0)))
-        .named("distances")
-        .collect();
+    let distances = distances.named("distances").save();
+    context.feedback(start_rel.map(|n| (n, 0)), distances_input.clone());
 
     let distance_to_end = distances
         .get()

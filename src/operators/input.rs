@@ -6,32 +6,29 @@ use crate::{
     op::Op,
     relation::Relation,
     value_count::ValueCount,
+    who::Who,
 };
 
 #[derive(Derivative)]
 #[derivative(Clone(bound = ""))]
 pub struct Input<T> {
     pub(crate) context_id: ContextId,
-    sender: Sender<(T, ValueCount)>,
+    sender: Sender<(T, Who)>,
 }
 
 pub type InputRelation<T> = Relation<T, InputOp<T>>;
 
 impl<T> Input<T> {
-    pub(crate) fn new(context_id: ContextId, sender: Sender<(T, ValueCount)>) -> Self {
+    pub(crate) fn new(context_id: ContextId, sender: Sender<(T, Who)>) -> Self {
         Self { context_id, sender }
     }
 
-    pub fn send(&mut self, elem: T) -> Result<(), T> {
-        self.sender
-            .send((elem, ValueCount(1)))
-            .map_err(|(elem, _)| elem)
+    pub(crate) fn send_count(&mut self, elem: T, who: Who) -> Result<(), T> {
+        self.sender.send((elem, who)).map_err(|(err, _)| err)
     }
 
-    pub fn unsend(&mut self, elem: T) -> Result<(), T> {
-        self.sender
-            .send((elem, ValueCount(-1)))
-            .map_err(|(elem, _)| elem)
+    pub fn send(&mut self, elem: T) -> Result<(), T> {
+        self.send_count(elem, Who::User)
     }
 }
 
