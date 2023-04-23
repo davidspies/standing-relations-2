@@ -10,9 +10,10 @@ arrayvec = "*"
 derivative = "*"
 generic_map.path = "../generic_map"
 index_list = "*"
+log = { version = "*", optional = true }
 redis = { version = "*", optional = true }
 slice-group-by = "*"
 uuid = { version = "*", features = ["v4"] }
 
 [features]
-redis = ["dep:redis"]
+redis = ["dep:log", "dep:redis"]

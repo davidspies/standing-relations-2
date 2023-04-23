@@ -14,7 +14,18 @@ use crate::{
 
 use super::{PipeT, ProcessResult};
 
-pub struct RedisPipe<T, C> {
+impl<T: Debug, C> Drop for RedisPipe<T, C> {
+    fn drop(&mut self) {
+        for (value, _) in self.values.iter() {
+            let mut connection = self.client.get_connection().unwrap();
+            connection
+                .del(RedisKey(&self.name, value))
+                .unwrap_or_else(|err| log::error!("Redis error: {}", err));
+        }
+    }
+}
+
+pub struct RedisPipe<T: Debug, C> {
     name: String,
     relation: RelationInner<T, C>,
     values: HashMap<T, ValueCount>,
@@ -22,7 +33,7 @@ pub struct RedisPipe<T, C> {
     changed_values_scratch: HashMap<T, ValueCount>,
     changed_keys_scratch: HashSet<T>,
 }
-impl<T, C> RedisPipe<T, C> {
+impl<T: Debug, C> RedisPipe<T, C> {
     pub(crate) fn new(name: String, relation: RelationInner<T, C>, client: redis::Client) -> Self {
         Self {
             name,
