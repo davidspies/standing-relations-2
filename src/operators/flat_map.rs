@@ -1,5 +1,5 @@
 use crate::{
-    context::{CommitId, Ids},
+    context::{CommitId, Level},
     op::Op,
     relation::RelationInner,
     value_count::ValueCount,
@@ -25,10 +25,10 @@ where
     fn type_name(&self) -> &'static str {
         "flat_map"
     }
-    fn foreach<F: FnMut(T, Ids, ValueCount)>(&mut self, current_id: CommitId, mut f: F) {
-        self.sub_rel.foreach(current_id, |x, ids, count| {
+    fn foreach<F: FnMut(T, Level, ValueCount)>(&mut self, current_id: CommitId, mut f: F) {
+        self.sub_rel.foreach(current_id, |x, lvl, count| {
             for y in (self.g)(x) {
-                f(y, ids, count)
+                f(y, lvl, count)
             }
         })
     }

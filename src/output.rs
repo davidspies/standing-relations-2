@@ -6,7 +6,7 @@ use std::{
 };
 
 use crate::{
-    context::CommitId,
+    context::{CommitId, Level},
     op::{DynOp, Op},
     operators::save::SavedOp,
     relation::RelationInner,
@@ -15,7 +15,7 @@ use crate::{
 
 struct OutputInner<T, C> {
     relation: RelationInner<T, C>,
-    values: HashMap<T, ValueCount>,
+    values: HashMap<(T, Level), ValueCount>,
 }
 
 impl<T: Eq + Hash, C: Op<T>> OutputInner<T, C> {
@@ -42,7 +42,7 @@ impl<T, C> Output<T, C> {
         }
     }
 
-    pub fn get(&self) -> Ref<HashMap<T, ValueCount>>
+    pub fn get(&self) -> Ref<HashMap<(T, Level), ValueCount>>
     where
         T: Eq + Hash,
         C: Op<T>,

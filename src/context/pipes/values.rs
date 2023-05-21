@@ -1,12 +1,12 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use derivative::Derivative;
 
-use crate::{context::DataId, ValueCount};
+use crate::ValueCount;
 
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
 pub(super) struct Values<T> {
     pub(super) values: HashMap<T, ValueCount>,
-    pub(super) seen: HashMap<T, DataId>,
+    pub(super) seen: HashSet<T>,
 }

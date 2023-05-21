@@ -65,7 +65,7 @@ fn dijkstra<Node: Debug + Ord + Hash + Clone>(
         Ok(()) => None,
         Err(0) => {
             let m = end_distance_output.get();
-            let (&k, v) = m.get_singleton().unwrap();
+            let (&(k, _), v) = m.get_singleton().unwrap();
             eprintln!("{:?}: {:?}", k, v);
             Some(k)
         }

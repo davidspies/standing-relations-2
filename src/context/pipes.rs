@@ -16,7 +16,7 @@ pub(crate) trait Processable {
 
 pub(crate) trait PipeT: Processable {
     fn push_frame(&mut self);
-    fn pop_frame(&mut self, commit_id: CommitId) -> Result<(), Dropped>;
+    fn pop_frame(&mut self) -> Result<(), Dropped>;
 }
 
 pub(crate) enum ProcessResult {

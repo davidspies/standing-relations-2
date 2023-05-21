@@ -1,11 +1,8 @@
-use std::{
-    collections::{hash_map, HashSet},
-    hash::Hash,
-};
+use std::{collections::HashSet, hash::Hash};
 
 use crate::{
     channel,
-    context::{CommitId, Dropped, Ids},
+    context::{CommitId, Dropped, Level},
     generic_map::AddMap,
     value_count::ValueCount,
     who::Who,
@@ -15,7 +12,7 @@ use super::{values::Values, PipeT, ProcessResult, Processable};
 
 pub(crate) struct UntrackedInputPipe<T> {
     receiver: channel::Receiver<(T, Who)>,
-    sender: channel::Sender<(T, Ids, ValueCount)>,
+    sender: channel::Sender<(T, Level, ValueCount)>,
     received: Values<T>,
     changed_keys_scratch: HashSet<T>,
 }
@@ -23,7 +20,7 @@ pub(crate) struct UntrackedInputPipe<T> {
 impl<T> UntrackedInputPipe<T> {
     pub(crate) fn new(
         receiver: channel::Receiver<(T, Who)>,
-        sender: channel::Sender<(T, Ids, ValueCount)>,
+        sender: channel::Sender<(T, Level, ValueCount)>,
     ) -> Self {
         UntrackedInputPipe {
             receiver,
@@ -35,8 +32,8 @@ impl<T> UntrackedInputPipe<T> {
 }
 
 impl<T: Eq + Hash + Clone> Processable for UntrackedInputPipe<T> {
-    fn process(&mut self, commit_id: CommitId) -> Result<ProcessResult, Dropped> {
-        let ids: Ids = Ids::processed(commit_id);
+    fn process(&mut self, _commit_id: CommitId) -> Result<ProcessResult, Dropped> {
+        let level = Level(0);
         let mut result = ProcessResult::Unchanged;
         while let Some((value, who)) = self.receiver.try_recv() {
             self.changed_keys_scratch.insert(value.clone());
@@ -44,10 +41,9 @@ impl<T: Eq + Hash + Clone> Processable for UntrackedInputPipe<T> {
         }
         for value in self.changed_keys_scratch.drain() {
             if self.received.values.contains_key(&value) {
-                if let hash_map::Entry::Vacant(vac) = self.received.seen.entry(value.clone()) {
+                if self.received.seen.insert(value.clone()) {
                     result = ProcessResult::Changed;
-                    vac.insert(ids.data_id());
-                    if self.sender.send((value, ids, ValueCount(1))).is_err() {
+                    if self.sender.send((value, level, ValueCount(1))).is_err() {
                         return Err(Dropped);
                     }
                 }
@@ -59,7 +55,7 @@ impl<T: Eq + Hash + Clone> Processable for UntrackedInputPipe<T> {
 
 impl<T: Eq + Hash + Clone> PipeT for UntrackedInputPipe<T> {
     fn push_frame(&mut self) {}
-    fn pop_frame(&mut self, _commit_id: CommitId) -> Result<(), Dropped> {
+    fn pop_frame(&mut self) -> Result<(), Dropped> {
         Ok(())
     }
 }

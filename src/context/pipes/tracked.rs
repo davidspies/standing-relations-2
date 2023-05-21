@@ -1,6 +1,5 @@
 use std::{
-    cmp::Reverse,
-    collections::{hash_map, HashMap, HashSet},
+    collections::{HashMap, HashSet},
     hash::Hash,
 };
 
@@ -8,7 +7,7 @@ use derivative::Derivative;
 
 use crate::{
     channel,
-    context::{CommitId, DataId, Dropped, Ids},
+    context::{CommitId, Dropped, Level},
     generic_map::AddMap,
     value_count::ValueCount,
     who::Who,
@@ -18,7 +17,7 @@ use super::{values::Values, PipeT, ProcessResult, Processable};
 
 pub(crate) struct TrackedInputPipe<T> {
     receiver: channel::Receiver<(T, Who)>,
-    sender: channel::Sender<(T, Ids, ValueCount)>,
+    sender: channel::Sender<(T, Level, ValueCount)>,
     received: Values<T>,
     frame_changes: Vec<Frame<T>>,
     changed_keys_scratch: HashSet<T>,
@@ -27,7 +26,7 @@ pub(crate) struct TrackedInputPipe<T> {
 impl<T> TrackedInputPipe<T> {
     pub(crate) fn new(
         receiver: channel::Receiver<(T, Who)>,
-        sender: channel::Sender<(T, Ids, ValueCount)>,
+        sender: channel::Sender<(T, Level, ValueCount)>,
     ) -> Self {
         TrackedInputPipe {
             receiver,
@@ -37,11 +36,15 @@ impl<T> TrackedInputPipe<T> {
             changed_keys_scratch: HashSet::new(),
         }
     }
+
+    fn level(&self) -> Level {
+        Level(self.frame_changes.len())
+    }
 }
 
 impl<T: Eq + Hash + Clone> Processable for TrackedInputPipe<T> {
-    fn process(&mut self, commit_id: CommitId) -> Result<ProcessResult, Dropped> {
-        let ids: Ids = Ids::processed(commit_id);
+    fn process(&mut self, _commit_id: CommitId) -> Result<ProcessResult, Dropped> {
+        let level = self.level();
         let mut result = ProcessResult::Unchanged;
         while let Some((value, who)) = self.receiver.try_recv() {
             self.changed_keys_scratch.insert(value.clone());
@@ -54,13 +57,12 @@ impl<T: Eq + Hash + Clone> Processable for TrackedInputPipe<T> {
         }
         for value in self.changed_keys_scratch.drain() {
             if self.received.values.contains_key(&value) {
-                if let hash_map::Entry::Vacant(vac) = self.received.seen.entry(value.clone()) {
+                if self.received.seen.insert(value.clone()) {
                     result = ProcessResult::Changed;
-                    vac.insert(ids.data_id());
                     if let Some(frame) = self.frame_changes.last_mut() {
-                        frame.seen.insert(value.clone(), ids.data_id());
+                        frame.seen.insert(value.clone());
                     }
-                    if self.sender.send((value, ids, ValueCount(1))).is_err() {
+                    if self.sender.send((value, level, ValueCount(1))).is_err() {
                         return Err(Dropped);
                     }
                 }
@@ -74,20 +76,15 @@ impl<T: Eq + Hash + Clone> PipeT for TrackedInputPipe<T> {
     fn push_frame(&mut self) {
         self.frame_changes.push(Frame::default());
     }
-    fn pop_frame(&mut self, commit_id: CommitId) -> Result<(), Dropped> {
+    fn pop_frame(&mut self) -> Result<(), Dropped> {
+        let level = self.level();
         let frame = self.frame_changes.pop().unwrap();
         for (value, count) in frame.user_values {
             self.received.values.add((value, -count));
         }
-        let mut to_send = Vec::from_iter(frame.seen);
-        to_send.sort_by_key(|&(_, data_id)| Reverse(data_id));
-        for (value, data_id) in to_send {
+        for value in frame.seen {
             self.received.seen.remove(&value);
-            if self
-                .sender
-                .send((value, Ids::new(commit_id, data_id), ValueCount(-1)))
-                .is_err()
-            {
+            if self.sender.send((value, level, ValueCount(-1))).is_err() {
                 return Err(Dropped);
             }
         }
@@ -99,5 +96,5 @@ impl<T: Eq + Hash + Clone> PipeT for TrackedInputPipe<T> {
 #[derivative(Default(bound = ""))]
 struct Frame<T> {
     user_values: HashMap<T, ValueCount>,
-    seen: HashMap<T, DataId>,
+    seen: HashSet<T>,
 }

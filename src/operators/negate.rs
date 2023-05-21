@@ -1,5 +1,5 @@
 use crate::{
-    context::{CommitId, Ids},
+    context::{CommitId, Level},
     op::Op,
     relation::RelationInner,
     value_count::ValueCount,
@@ -19,8 +19,8 @@ impl<T, C: Op<T>> Op<T> for Negate<T, C> {
     fn type_name(&self) -> &'static str {
         "negate"
     }
-    fn foreach<F: FnMut(T, Ids, ValueCount)>(&mut self, current_id: CommitId, mut f: F) {
+    fn foreach<F: FnMut(T, Level, ValueCount)>(&mut self, current_id: CommitId, mut f: F) {
         self.sub_rel
-            .foreach(current_id, |value, ids, count| f(value, ids, -count))
+            .foreach(current_id, |value, lvl, count| f(value, lvl, -count))
     }
 }

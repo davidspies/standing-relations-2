@@ -1,11 +1,10 @@
-use std::cell::Cell;
-use std::cmp::Reverse;
 use std::collections::HashSet;
 #[cfg(feature = "redis")]
 use std::fmt::Debug;
 use std::hash::Hash;
 use std::rc::Rc;
 use std::sync::Arc;
+use std::{cell::Cell, fmt::Display};
 
 use index_list::IndexList;
 use uuid::Uuid;
@@ -39,31 +38,11 @@ pub(crate) struct ContextId(Uuid);
 pub struct CommitId(usize);
 
 #[derive(PartialEq, Eq, Hash, Clone, Copy, Debug, Default, PartialOrd, Ord)]
-pub struct DataId(usize);
+pub struct Level(usize);
 
-#[derive(PartialEq, Eq, Hash, Clone, Copy, Debug, Default, PartialOrd, Ord)]
-pub struct Ids {
-    commit_id: CommitId,
-    data_id: Reverse<DataId>,
-}
-
-impl Ids {
-    pub fn new(commit_id: CommitId, data_id: DataId) -> Self {
-        Self {
-            commit_id,
-            data_id: Reverse(data_id),
-        }
-    }
-
-    pub fn data_id(&self) -> DataId {
-        self.data_id.0
-    }
-
-    fn processed(commit_id: CommitId) -> Ids {
-        Self {
-            commit_id,
-            data_id: Reverse(DataId(commit_id.0)),
-        }
+impl Display for Level {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(&self.0, f)
     }
 }
 
@@ -104,7 +83,7 @@ impl<'a> CreationContext<'a> {
     }
     pub fn input<T: Eq + Hash + Clone + 'a>(&mut self) -> (Input<T>, Relation<T, InputOp<T>>) {
         let (sender1, receiver1) = channel::new::<(T, Who)>();
-        let (sender2, receiver2) = channel::new::<(T, Ids, ValueCount)>();
+        let (sender2, receiver2) = channel::new::<(T, Level, ValueCount)>();
         self.input_pipes
             .push(Box::new(TrackedInputPipe::new(receiver1, sender2)));
         (
@@ -116,7 +95,7 @@ impl<'a> CreationContext<'a> {
         &mut self,
     ) -> (Input<T>, Relation<T, InputOp<T>>) {
         let (sender1, receiver1) = channel::new::<(T, Who)>();
-        let (sender2, receiver2) = channel::new::<(T, Ids, ValueCount)>();
+        let (sender2, receiver2) = channel::new::<(T, Level, ValueCount)>();
         self.input_pipes
             .push(Box::new(UntrackedInputPipe::new(receiver1, sender2)));
         (
@@ -231,7 +210,7 @@ impl ExecutionContext<'_> {
         let result = f(self);
 
         self.input_pipes
-            .retain_mut(|input| input.pop_frame(self.commit_id.get()).is_ok());
+            .retain_mut(|input| input.pop_frame().is_ok());
 
         self.commit_id.set(CommitId(self.commit_id.get().0 + 1));
         let mut i = self.feedback_pipes.first_index();

@@ -1,7 +1,7 @@
 use std::{collections::HashMap, hash::Hash};
 
 use crate::{
-    context::{CommitId, Dropped},
+    context::{CommitId, Dropped, Level},
     op::Op,
     relation::RelationInner,
     value_count::ValueCount,
@@ -14,7 +14,7 @@ pub type InterruptId = usize;
 pub struct Interrupt<T, C> {
     relation: RelationInner<T, C>,
     interrupt_id: InterruptId,
-    values: HashMap<T, ValueCount>,
+    values: HashMap<(T, Level), ValueCount>,
 }
 
 impl<T, C> Interrupt<T, C> {
